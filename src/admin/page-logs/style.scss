@@ -1,0 +1,97 @@
+.redirect-txt-admin-content-logs {
+	max-width: 1000px;
+}
+
+.redirect-txt-admin-logs-card {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+
+	h2 {
+		display: block;
+		margin-top: 8px;
+		margin-bottom: 0;
+		font-size: 18px;
+		font-weight: 300;
+	}
+
+	.redirect-txt-admin-logs-card-table {
+		background-color: #fff;
+		border: 1px solid #e4e4e7;
+		border-radius: 7px;
+		overflow: auto;
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+
+		thead th {
+			font-weight: 500;
+			padding-left: 1rem;
+			padding-right: 1rem;
+			height: 3rem;
+			text-align: left;
+		}
+		thead tr {
+			background-color: #f9f9f9;
+		}
+		tr {
+			border-bottom: 1px solid #e4e4e7;
+			transition: 0.15s background-color;
+
+			&:hover {
+				background-color: #f9f9f9;
+			}
+		}
+		tbody th,
+		tbody td {
+			padding: 1rem;
+		}
+	}
+
+	.redirect-txt-admin-logs-card-table-th-status {
+		width: 50px;
+		text-align: center;
+	}
+	.redirect-txt-admin-logs-card-table-th-date {
+		width: 110px;
+	}
+
+	.redirect-txt-admin-logs-status {
+		font-weight: 500;
+		padding: 0.2rem 0.3rem;
+		background-color: #dfdfdf;
+		border-radius: 0.3rem;
+
+		&-301,
+		&-308 {
+			background-color: #ffedc0;
+		}
+		&-302,
+		&-303,
+		&-307 {
+			background-color: #e4ecff;
+		}
+		&-403,
+		&-404,
+		&-410 {
+			background-color: #ffdcdc;
+		}
+	}
+
+	.redirect-txt-admin-logs-rule-from {
+		display: inline-block;
+		font-weight: 600;
+
+		> span {
+			margin-left: 0.4rem;
+			opacity: 0.2;
+		}
+	}
+	.redirect-txt-admin-logs-rule-to {
+		display: inline-block;
+		opacity: 0.4;
+		margin-top: 0.15rem;
+	}
+}

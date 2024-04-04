@@ -1,0 +1,37 @@
+.redirect-txt-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 18px;
+	border-radius: 7px;
+	background-color: #000;
+	border: 1px solid #000;
+	color: #fff;
+	cursor: pointer;
+
+	&:hover,
+	&:focus {
+		background-color: #303030;
+	}
+
+	&:focus {
+		box-shadow: 0 0 0 2px rgba(#000, 30%);
+		outline: 2px solid transparent;
+	}
+
+	&:disabled {
+		border: 1px solid #bfbfbf;
+		background-color: #dcdcdc;
+		color: #000;
+		opacity: 0.3;
+		pointer-events: none;
+	}
+
+	svg {
+		width: 20px;
+		height: auto;
+		margin: -5px;
+		margin-left: 0;
+		animation: 1s redirect-txt-settings-loading-icon infinite linear;
+	}
+}

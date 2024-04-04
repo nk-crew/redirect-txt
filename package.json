@@ -1,0 +1,41 @@
+{
+	"name": "redirect-txt",
+	"version": "0.1.0",
+	"description": "A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest.",
+	"author": "Redirect.txt Team",
+	"license": "GPL-2.0-or-later",
+	"files": [
+		"assets",
+		"build",
+		"classes",
+		"redirect-txt.php",
+		"readme.txt"
+	],
+	"scripts": {
+		"dev": "wp-scripts start --progress",
+		"build": "wp-scripts build --progress",
+		"build:prod": "npm run build && npm run plugin-zip",
+		"lint:css": "wp-scripts lint-style",
+		"lint:js": "wp-scripts lint-js",
+		"lint:php": "composer run phpcs",
+		"packages-update": "wp-scripts packages-update",
+		"plugin-zip": "wp-scripts plugin-zip"
+	},
+	"devDependencies": {
+		"@babel/node": "^7.23.9",
+		"@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+		"@babel/plugin-transform-react-jsx": "^7.23.4",
+		"@babel/preset-env": "^7.24.0",
+		"@babel/register": "^7.23.7",
+		"@wordpress/eslint-plugin": "^17.12.0",
+		"@wordpress/prettier-config": "^3.12.0",
+		"@wordpress/scripts": "^27.6.0",
+		"@wordpress/stylelint-config": "^21.38.0",
+		"prettier": "^3.2.5"
+	},
+	"dependencies": {
+		"@uiw/react-textarea-code-editor": "^3.0.2",
+		"clsx": "^2.1.0",
+		"react-transition-group": "^4.4.5"
+	}
+}

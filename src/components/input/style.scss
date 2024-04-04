@@ -1,0 +1,26 @@
+.redirect-txt-input {
+	flex: 1;
+
+	input {
+		width: 100%;
+		padding: 6px 15px;
+		font-size: 1em;
+		border: 1px solid #e4e4e7;
+		border-radius: 7px;
+
+		&:focus {
+			box-shadow: 0 0 0 2px rgba(#000, 30%);
+			outline: 2px solid transparent;
+		}
+	}
+
+	&.redirect-txt-input-error input {
+		border-color: var(--redirect-txt-error-color);
+	}
+}
+
+.redirect-txt-input-error-text {
+	font-size: 12px;
+	margin-top: 2px;
+	color: var(--redirect-txt-error-color);
+}

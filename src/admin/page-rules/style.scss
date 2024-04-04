@@ -1,0 +1,42 @@
+.redirect-txt-admin-content-rules {
+	max-width: 1000px;
+}
+
+.redirect-txt-admin-rules-card {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+
+	h2 {
+		display: block;
+		margin-top: 8px;
+		margin-bottom: 0;
+		font-size: 18px;
+		font-weight: 300;
+	}
+	.redirect-txt-admin-rules-card-description {
+		color: #3d3d3d;
+	}
+}
+
+.redirect-txt-admin-rules-error {
+	padding: 20px;
+	margin-top: 20px;
+	margin-bottom: -20px;
+	background-color: var(--redirect-txt-error-light-color);
+	color: var(--redirect-txt-error-color);
+	border-left: 3px solid var(--redirect-txt-error-color);
+}
+
+.redirect-txt-admin-rules-actions {
+	margin-top: 50px;
+}
+
+@keyframes redirect-txt-rules-loading-icon {
+	0% {
+		transform: rotate(0);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
