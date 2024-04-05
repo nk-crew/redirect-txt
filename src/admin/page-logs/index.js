@@ -6,6 +6,7 @@ import './style.scss';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import clsx from 'clsx';
+import TimeAgo from '../../components/time-ago';
 
 const { adminUrl } = window.redirectTxtAdminData;
 
@@ -134,9 +135,7 @@ export default function PageLogs() {
 										<td>
 											{date ? (
 												<span className="redirect-txt-admin-logs-date">
-													{date.toLocaleString(
-														'en-US'
-													)}
+													<TimeAgo date={date} />
 												</span>
 											) : (
 												'-'

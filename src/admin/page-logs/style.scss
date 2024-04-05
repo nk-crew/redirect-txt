@@ -54,10 +54,6 @@
 		width: 50px;
 		text-align: center;
 	}
-	.redirect-txt-admin-logs-card-table-th-date {
-		width: 110px;
-	}
-
 	.redirect-txt-admin-logs-status {
 		font-weight: 500;
 		padding: 0.2rem 0.3rem;
@@ -93,5 +89,16 @@
 		display: inline-block;
 		opacity: 0.4;
 		margin-top: 0.15rem;
+	}
+
+	.redirect-txt-admin-logs-card-table-th-date {
+		width: 22%;
+	}
+	.redirect-txt-admin-logs-date {
+		span {
+			display: inline-block;
+			opacity: 0.4;
+			margin-top: 0.15rem;
+		}
 	}
 }
