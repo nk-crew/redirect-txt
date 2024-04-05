@@ -18,21 +18,21 @@ class Redirect_Txt_Redirects {
 	 *
 	 * @var array
 	 */
-	private $whitelist_host;
+	public static $whitelist_host;
 
 	/**
 	 * Redirect_Txt_Redirects constructor.
 	 */
-	public function __construct() {
+	public static function init() {
 		if ( is_admin() || defined( 'WP_CLI' ) && WP_CLI ) {
 			return;
 		}
 
-		add_action( 'parse_request', [ $this, 'maybe_process_redirect' ], 1 );
+		add_action( 'parse_request', 'Redirect_Txt_Redirects::maybe_process_redirect', 1 );
 
 		// Additional redirection check for post ID used in `from` field.
 		// We need this to check the actual wp_query of the current post loaded.
-		add_action( 'wp', [ $this, 'maybe_process_redirect' ], 1 );
+		add_action( 'wp', 'Redirect_Txt_Redirects::maybe_process_redirect', 1 );
 	}
 
 	/**
@@ -42,8 +42,8 @@ class Redirect_Txt_Redirects {
 	 *
 	 * @return string
 	 */
-	private function format_url( $url ) {
-		$url = urldecode( html_entity_decode( $url ) );
+	public static function format_url( $url ) {
+		$url = urldecode( html_entity_decode( trim( $url ) ) );
 
 		if ( preg_match( '/^www\./i', $url ) ) {
 			$url = 'http://' . $url;
@@ -57,6 +57,7 @@ class Redirect_Txt_Redirects {
 		} else {
 			$complete_url = rtrim( home_url(), '/' ) . '/' . $url;
 
+			// phpcs:ignore
 			list( $uprotocol, $uempty, $uhost, $from ) = explode( '/', $complete_url, 4 );
 
 			$from = '/' . $from;
@@ -76,7 +77,7 @@ class Redirect_Txt_Redirects {
 	 *
 	 * @return array
 	 */
-	public function get_valid_status_codes() {
+	public static function get_valid_status_codes() {
 		$status_codes = array(
 			301 => esc_html__( 'Moved Permanently', 'redirect-txt' ),
 			302 => esc_html__( 'Found', 'redirect-txt' ),
@@ -104,23 +105,24 @@ class Redirect_Txt_Redirects {
 	/**
 	 * Parse redirects and prepare array.
 	 *
-	 * @param bool $allow_url_only_redirects - allow redirecting using URLs only.
-	 * @param bool $allow_post_from - allow redirecting from post IDs.
+	 * @param string $rules - string with rules.
+	 * @param bool   $allow_url_only_redirects - allow redirecting using URLs only.
+	 * @param bool   $allow_post_from - allow redirecting from post IDs.
 	 *
 	 * @return array
 	 */
-	public function get_redirect_rules( $allow_url_only_redirects = true, $allow_post_from = false ) {
+	public static function parse_redirect_rules( $rules, $allow_url_only_redirects = true, $allow_post_from = false ) {
 		$redirects = array();
-		$rules     = get_option( 'redirect_txt_rules', '' );
 
 		if ( is_string( $rules ) && $rules ) {
+
 			// Remove comments.
 			$rules = preg_replace( '/#.*/', '', $rules );
 
 			// Split string by lines.
 			$lines = preg_split( "/\r\n|\n|\r/", $rules );
 
-			$valid_status_codes = $this->get_valid_status_codes();
+			$valid_status_codes = self::get_valid_status_codes();
 			$status             = apply_filters( 'redirect_txt_default_status', 301 );
 
 			// Parse each line and prepare redirect array.
@@ -177,6 +179,20 @@ class Redirect_Txt_Redirects {
 		return $redirects;
 	}
 
+	/**
+	 * Get redirects from DB and prepare array.
+	 *
+	 * @param bool $allow_url_only_redirects - allow redirecting using URLs only.
+	 * @param bool $allow_post_from - allow redirecting from post IDs.
+	 *
+	 * @return array
+	 */
+	public static function get_redirect_rules( $allow_url_only_redirects = true, $allow_post_from = false ) {
+		$rules = get_option( 'redirect_txt_rules', '' );
+
+		return self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
+	}
+
 
 	/**
 	 * Apply whitelisted host to allowed_redirect_hosts filter
@@ -185,8 +201,8 @@ class Redirect_Txt_Redirects {
 	 *
 	 * @return array
 	 */
-	public function filter_allowed_redirect_hosts( $hosts ) {
-		$without_www = preg_replace( '/^www\./i', '', $this->whitelist_host );
+	public static function filter_allowed_redirect_hosts( $hosts ) {
+		$without_www = preg_replace( '/^www\./i', '', self::$whitelist_host );
 		$with_www    = 'www.' . $without_www;
 
 		$hosts[] = $without_www;
@@ -196,21 +212,19 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
-	 * Check if URL match any of redirect rules and return it.
+	 * Check if URL match any of rules and return it.
 	 *
-	 * @param string $requested_path - path to check.
+	 * @param string $url - full URL to check if it match anything in rules list.
+	 * @param string $rules - rules list.
+	 * @param bool   $allow_url_only_redirects - allow redirecting using URLs only.
+	 * @param bool   $allow_post_from - allow redirecting from post IDs.
 	 *
 	 * @return bool|array
 	 */
-	public function match_redirect( $requested_path ) {
+	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false ) {
 		global $wp_query;
 
-		// Allow redirects from post IDs.
-		// `$wp_query` is available in the `wp` hook only.
-		$allow_url_only_redirects = current_action() !== 'wp';
-		$allow_post_from          = $wp_query->get_queried_object();
-
-		$redirects = $this->get_redirect_rules( $allow_url_only_redirects, $allow_post_from );
+		$redirects = self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
 
 		if ( empty( $redirects ) ) {
 			return false;
@@ -227,40 +241,40 @@ class Redirect_Txt_Redirects {
 		}
 
 		if ( isset( $parsed_home_url['path'] ) && '/' !== $parsed_home_url['path'] ) {
-			$requested_path = preg_replace( '@' . $parsed_home_url['path'] . '@i', '', $requested_path, 1 );
+			$url = preg_replace( '@' . $parsed_home_url['path'] . '@i', '', $url, 1 );
 		}
 
-		if ( empty( $requested_path ) ) {
-			$requested_path = '/';
+		if ( empty( $url ) ) {
+			$url = '/';
 		}
 
 		// Normalized path is used for matching but not for replace.
-		$normalized_requested_path = strtolower( $requested_path );
+		$normalized_requested_url = strtolower( $url );
 
 		if ( function_exists( 'wp_parse_url' ) ) {
-			$parsed_requested_path = wp_parse_url( $normalized_requested_path );
+			$parsed_requested_url = wp_parse_url( $normalized_requested_url );
 		} else {
 			// phpcs:ignore
-			$parsed_requested_path = parse_url( $normalized_requested_path );
+			$parsed_requested_url = parse_url( $normalized_requested_url );
 		}
 
 		// Normalize the request path with and without query strings, for comparison later.
-		$normalized_requested_path_no_query = '';
-		$requested_query_params             = '';
+		$normalized_requested_url_no_query = '';
+		$requested_query_params            = '';
 
-		if ( ! empty( $parsed_requested_path['path'] ) ) {
-			$normalized_requested_path_no_query = untrailingslashit( stripslashes( $parsed_requested_path['path'] ) );
+		if ( ! empty( $parsed_requested_url['path'] ) ) {
+			$normalized_requested_url_no_query = untrailingslashit( stripslashes( $parsed_requested_url['path'] ) );
 		}
 
-		if ( ! empty( $parsed_requested_path['query'] ) ) {
-			$requested_query_params = $parsed_requested_path['query'];
+		if ( ! empty( $parsed_requested_url['query'] ) ) {
+			$requested_query_params = $parsed_requested_url['query'];
 		}
 
 		$queried_object = $wp_query->get_queried_object();
 
 		foreach ( $redirects as $redirect ) {
-			$from = is_numeric( $redirect['from'] ) ? (int) $redirect['from'] : $this->format_url( $redirect['from'] );
-			$to   = is_numeric( $redirect['to'] ) ? (int) $redirect['to'] : $this->format_url( $redirect['to'] );
+			$from = is_numeric( $redirect['from'] ) ? (int) $redirect['from'] : self::format_url( $redirect['from'] );
+			$to   = is_numeric( $redirect['to'] ) ? (int) $redirect['to'] : self::format_url( $redirect['to'] );
 
 			// Check if the redirection destination is valid, otherwise just skip it (unless this is a 4xx request).
 			if ( empty( $to ) && ! in_array( $redirect['status'], array( 403, 404, 410 ), true ) ) {
@@ -282,7 +296,7 @@ class Redirect_Txt_Redirects {
 			$match_query_params = strpos( $from, '?' );
 
 			if ( ! $matched_path ) {
-				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_path_no_query ) ) ? $normalized_requested_path_no_query : $normalized_requested_path;
+				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_url_no_query ) ) ? $normalized_requested_url_no_query : $normalized_requested_url;
 				$matched_path = $to_match === $from;
 			}
 
@@ -303,8 +317,8 @@ class Redirect_Txt_Redirects {
 				}
 
 				if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
-					$this->whitelist_host = $parsed_redirect['host'];
-					add_filter( 'allowed_redirect_hosts', array( $this, 'filter_allowed_redirect_hosts' ) );
+					self::$whitelist_host = $parsed_redirect['host'];
+					add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
 				}
 
 				// Re-add the query params if they've not already been added by the wildcard
@@ -333,19 +347,38 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * Check if URL match any of redirect rules and return it.
+	 *
+	 * @param string $requested_url - url to check.
+	 *
+	 * @return bool|array
+	 */
+	public static function match_redirect( $requested_url ) {
+		global $wp_query;
+
+		// Allow redirects from post IDs.
+		// `$wp_query` is available in the `wp` hook only.
+		$allow_url_only_redirects = current_action() !== 'wp';
+		$allow_post_from          = ! ! $wp_query->get_queried_object();
+		$rules                    = get_option( 'redirect_txt_rules', '' );
+
+		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from );
+	}
+
+	/**
 	 * Check URL for available redirect and process it.
 	 *
 	 * @return void
 	 */
-	public function maybe_process_redirect() {
+	public static function maybe_process_redirect() {
 		if ( is_admin() ) {
 			return;
 		}
 
-		$requested_path = esc_url_raw( apply_filters( 'redirect_txt_requested_path', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
-		$requested_path = untrailingslashit( stripslashes( $requested_path ) );
+		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
+		$requested_url = untrailingslashit( stripslashes( $requested_url ) );
 
-		$match_redirect = $this->match_redirect( $requested_path );
+		$match_redirect = self::match_redirect( $requested_url );
 
 		if ( ! $match_redirect ) {
 			return;
@@ -354,7 +387,7 @@ class Redirect_Txt_Redirects {
 		do_action( 'redirect_txt_redirect_hit', $match_redirect );
 
 		// Use default status code if an invalid value is set.
-		if ( ! isset( $this->get_valid_status_codes()[ $match_redirect['status'] ] ) ) {
+		if ( ! isset( self::get_valid_status_codes()[ $match_redirect['status'] ] ) ) {
 			$match_redirect['status'] = apply_filters( 'redirect_txt_default_status', 301 );
 		}
 
@@ -388,4 +421,4 @@ class Redirect_Txt_Redirects {
 	}
 }
 
-new Redirect_Txt_Redirects();
+Redirect_Txt_Redirects::init();

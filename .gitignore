@@ -4,6 +4,9 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.phpunit.result.cache
+/artifacts
+/tests/e2e/artifacts
 
 # Coverage directory used by tools like istanbul
 coverage

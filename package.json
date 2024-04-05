@@ -12,14 +12,24 @@
 		"readme.txt"
 	],
 	"scripts": {
-		"dev": "wp-scripts start --progress",
+		"dev": "wp-scripts start -- inline --progress",
 		"build": "wp-scripts build --progress",
 		"build:prod": "npm run build && npm run plugin-zip",
+		"wp-env": "wp-env",
+		"env:start": "wp-env start",
+		"env:stop": "wp-env stop",
+		"env:destroy": "wp-env destroy",
+		"test": "npm-run-all lint test:unit",
+		"pretest:unit:php": "wp-env start",
+		"test:unit:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' tests-wordpress vendor/bin/phpunit -c phpunit.xml.dist --verbose",
+		"lint": "concurrently \"npm run lint:js\" \"npm run lint:css\"",
 		"lint:css": "wp-scripts lint-style",
 		"lint:js": "wp-scripts lint-js",
-		"lint:php": "composer run phpcs",
+		"prelint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer install --no-interaction",
+		"lint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer run-script lint",
+		"plugin-zip": "wp-scripts plugin-zip",
 		"packages-update": "wp-scripts packages-update",
-		"plugin-zip": "wp-scripts plugin-zip"
+		"postinstall": "composer install"
 	},
 	"devDependencies": {
 		"@babel/node": "^7.23.9",
@@ -27,10 +37,13 @@
 		"@babel/plugin-transform-react-jsx": "^7.23.4",
 		"@babel/preset-env": "^7.24.0",
 		"@babel/register": "^7.23.7",
+		"@wordpress/env": "^9.7.0",
 		"@wordpress/eslint-plugin": "^17.12.0",
 		"@wordpress/prettier-config": "^3.12.0",
 		"@wordpress/scripts": "^27.6.0",
 		"@wordpress/stylelint-config": "^21.38.0",
+		"concurrently": "^8.2.2",
+		"npm-run-all": "^4.1.5",
 		"prettier": "^3.2.5"
 	},
 	"dependencies": {
