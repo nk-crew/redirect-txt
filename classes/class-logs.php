@@ -37,8 +37,10 @@ class Redirect_Txt_Logs {
 				'url_from'   => null,
 				'url_to'     => null,
 				'status'     => null,
-				'rule_from'  => null,
-				'rule_to'    => null,
+				'from_rule'  => null,
+				'from_type'  => null,
+				'to_rule'    => null,
+				'to_type'    => null,
 				// phpcs:ignore
 				'timestamp'  => current_time( 'timestamp' ),
 				// phpcs:ignore
@@ -88,8 +90,10 @@ class Redirect_Txt_Logs {
 				'url_from'  => $redirect['from'],
 				'url_to'    => $redirect['to'],
 				'status'    => $redirect['status'],
-				'rule_from' => $redirect['rule_from'],
-				'rule_to'   => $redirect['rule_to'],
+				'from_rule' => $redirect['from_rule'],
+				'from_type' => $redirect['from_type'],
+				'to_rule'   => $redirect['to_rule'],
+				'to_type'   => $redirect['to_type'],
 			)
 		);
 	}

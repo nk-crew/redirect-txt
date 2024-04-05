@@ -45,12 +45,10 @@ export default function PageLogs() {
 						<tbody>
 							{logs.map((log) => {
 								const date = new Date(log.timestamp * 1000);
-								const fromIsPost =
-									log.rule_from && !isNaN(log.rule_from);
-								const toIsPost =
-									log.rule_to && !isNaN(log.rule_to);
+								const fromIsPost = log.from_type === 'id';
+								const toIsPost = log.to_type === 'id';
 								const hasTo =
-									toIsPost || log.rule_to || log.url_to;
+									toIsPost || log.to_rule || log.url_to;
 
 								return (
 									<tr key={log.timestamp}>
@@ -79,18 +77,16 @@ export default function PageLogs() {
 															'readirect-txt'
 														)}
 														target="_blank"
-														href={`${adminUrl}/post.php?post=${log.rule_from}&action=edit`}
+														href={`${adminUrl}/post.php?post=${log.from_rule}&action=edit`}
 														rel="noreferrer"
 													>
-														#{log.rule_from}
+														#{log.from_rule}
 													</a>
 													{hasTo && <span>⤵︎</span>}
 												</span>
 											) : (
 												<span className="redirect-txt-admin-logs-rule-from">
-													{log.rule_from ||
-														log.url_from ||
-														'-'}
+													{log.url_from || '-'}
 													{hasTo && <span>⤵︎</span>}
 												</span>
 											)}
@@ -108,20 +104,18 @@ export default function PageLogs() {
 															'readirect-txt'
 														)}
 														target="_blank"
-														href={`${adminUrl}/post.php?post=${log.rule_to}&action=edit`}
+														href={`${adminUrl}/post.php?post=${log.to_rule}&action=edit`}
 														rel="noreferrer"
 													>
-														#{log.rule_to}
+														#{log.to_rule}
 													</a>
 												</span>
 											)}
-											{!toIsPost &&
-												(log.rule_to || log.url_to) && (
-													<span className="redirect-txt-admin-logs-rule-to">
-														{log.rule_to ||
-															log.url_to}
-													</span>
-												)}
+											{!toIsPost && log.url_to && (
+												<span className="redirect-txt-admin-logs-rule-to">
+													{log.url_to}
+												</span>
+											)}
 										</td>
 										<td>
 											{log.referrer ? (

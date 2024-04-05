@@ -137,7 +137,7 @@ jobs:
 
       # Verifies that PHPUnit actually runs in the first place. We want visibility
       # into issues which can cause it to fail silently, so we check the output
-      # to verify that at least 5 tests have passed. This is an arbitrary
+      # to verify that at least 6 tests have passed. This is an arbitrary
       # number, but makes sure a drastic change doesn't happen without us noticing.
       - name: Check number of passed tests
         run: |
@@ -150,7 +150,7 @@ jobs:
           fi
           # Extract just the number of tests from the string.
           num_tests=$(echo "$num_tests" | grep -Eo '[0-9]+')
-          if [ $num_tests -lt 5 ] ; then
+          if [ $num_tests -lt 6 ] ; then
             echo "Only $num_tests tests passed, which is much fewer than expected." && exit 1
           fi
           echo "$num_tests tests passed."

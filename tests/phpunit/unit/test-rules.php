@@ -53,7 +53,7 @@ class RulesTest extends WP_UnitTestCase {
 		// Simple match.
         $this->assertEquals(
 			Redirect_Txt_Redirects::match_url_to_rules(
-				home_url() . '/test-2',
+				'/test-2',
 				"
 					test-1: new-test-1
 					test-2: new-test-2
@@ -61,20 +61,117 @@ class RulesTest extends WP_UnitTestCase {
 			),
 			array(
 				'from'      => '/test-2',
+				'from_type' => 'url',
+				'from_rule' => 'test-2',
 				'to'        => '/new-test-2',
+				'to_type'   => 'url',
+				'to_rule'   => 'new-test-2',
 				'status'    => 301,
-				'rule_from' => 'test-2',
-				'rule_to'   => 'new-test-2',
 			)
 		);
 
 		// Don't match.
         $this->assertEquals(
 			Redirect_Txt_Redirects::match_url_to_rules(
-				home_url() . '/test',
+				'/test',
 				""
 			),
 			false
+		);
+    }
+
+    /**
+     * Test RegEx match URLs.
+     */
+    public function test_match_regex() {
+        $this->assertEquals(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/test/url/',
+				"
+					^/test/(.*): /new-test/$1
+				"
+			),
+			array(
+				'from'      => '/test/url/',
+				'from_type' => 'regex',
+				'from_rule' => '^/test/(.*)',
+				'to'        => '/new-test/url',
+				'to_type'   => 'url',
+				'to_rule'   => '/new-test/$1',
+				'status'    => 301,
+			)
+		);
+
+        $this->assertEquals(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/testurl/',
+				"
+					^/test(.*)url: /new-test/
+				"
+			),
+			array(
+				'from'      => '/testurl/',
+				'from_type' => 'regex',
+				'from_rule' => '^/test(.*)url',
+				'to'        => '/new-test',
+				'to_type'   => 'url',
+				'to_rule'   => '/new-test/',
+				'status'    => 301,
+			)
+		);
+
+        $this->assertEquals(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/test/?id=hello',
+				"
+					^/(.*)\?id=(.*): /$1?new-id=$2
+				"
+			),
+			array(
+				'from'      => '/test/?id=hello',
+				'from_type' => 'regex',
+				'from_rule' => '^/(.*)\?id=(.*)',
+				'to'        => '/test/?new-id=hello',
+				'to_type'   => 'url',
+				'to_rule'   => '/$1?new-id=$2',
+				'status'    => 301,
+			)
+		);
+
+        $this->assertEquals(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/2024/04/06/test/',
+				"
+					^/\d{4}/\d{2}/\d{2}/(.*): /$1
+				"
+			),
+			array(
+				'from'      => '/2024/04/06/test/',
+				'from_type' => 'regex',
+				'from_rule' => '^/\d{4}/\d{2}/\d{2}/(.*)',
+				'to'        => '/test',
+				'to_type'   => 'url',
+				'to_rule'   => '/$1',
+				'status'    => 301,
+			)
+		);
+
+        $this->assertEquals(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/test.html',
+				"
+					^/(.*?)\.html$: /$1
+				"
+			),
+			array(
+				'from'      => '/test.html',
+				'from_type' => 'regex',
+				'from_rule' => '^/(.*?)\.html$',
+				'to'        => '/test',
+				'to_type'   => 'url',
+				'to_rule'   => '/$1',
+				'status'    => 301,
+			)
 		);
     }
 
@@ -102,6 +199,9 @@ class RulesTest extends WP_UnitTestCase {
 
 			# External URLs:
 			test-5: https://example.com/
+
+			# RegEx support.
+			^/test-6/(.*): /new-test-6/$1
 
 			# You can use as many comments as you want to categorize your links better.
 		";
@@ -146,6 +246,11 @@ class RulesTest extends WP_UnitTestCase {
 				array(
 					'from'   => 'test-5',
 					'to'     => 'https://example.com/',
+					'status' => 302,
+				),
+				array(
+					'from'   => '^/test-6/(.*)',
+					'to'     => '/new-test-6/$1',
 					'status' => 302,
 				),
 			)

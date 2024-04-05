@@ -36,6 +36,29 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * Get URL type: [url,id,regex]
+	 *
+	 * @param string $url - url string.
+	 *
+	 * @return string
+	 */
+	public static function get_url_type( $url ) {
+		$type = 'url';
+
+		// Post ID.
+		if ( is_numeric( $url ) ) {
+			$type = 'id';
+
+			// Simple detection for regular expression if URL contains starts with ^
+			// .
+		} elseif ( preg_match( '/^\^/i', $url ) ) {
+			$type = 'regex';
+		}
+
+		return $type;
+	}
+
+	/**
 	 * Prepare `from` and `to` URLs.
 	 *
 	 * @param string $url - url string.
@@ -273,18 +296,43 @@ class Redirect_Txt_Redirects {
 		$queried_object = $wp_query->get_queried_object();
 
 		foreach ( $redirects as $redirect ) {
-			$from = is_numeric( $redirect['from'] ) ? (int) $redirect['from'] : self::format_url( $redirect['from'] );
-			$to   = is_numeric( $redirect['to'] ) ? (int) $redirect['to'] : self::format_url( $redirect['to'] );
+			$from_type    = self::get_url_type( $redirect['from'] );
+			$to_type      = self::get_url_type( $redirect['to'] );
+			$matched_path = false;
+
+			// Post ID.
+			if ( 'id' === $from_type ) {
+				$from = (int) $redirect['from'];
+
+				// RegEx.
+			} elseif ( 'regex' === $from_type ) {
+				$from = $redirect['from'];
+
+				// URL.
+			} else {
+				$from = self::format_url( $redirect['from'] );
+			}
+
+			// Post ID.
+			if ( 'id' === $to_type ) {
+				$to = (int) $redirect['to'];
+
+				// RegEx.
+			} elseif ( 'regex' === $from_type ) {
+				$to = $redirect['to'];
+
+				// URL.
+			} else {
+				$to = self::format_url( $redirect['to'] );
+			}
 
 			// Check if the redirection destination is valid, otherwise just skip it (unless this is a 4xx request).
 			if ( empty( $to ) && ! in_array( $redirect['status'], array( 403, 404, 410 ), true ) ) {
 				continue;
 			}
 
-			$matched_path = false;
-
 			// Redirect from current post ID.
-			if ( is_int( $from ) ) {
+			if ( 'id' === $from_type ) {
 				if ( $from === $queried_object->ID ) {
 					$from         = get_permalink( $from );
 					$matched_path = true;
@@ -295,6 +343,12 @@ class Redirect_Txt_Redirects {
 
 			$match_query_params = strpos( $from, '?' );
 
+			// RegEx.
+			if ( 'regex' === $from_type ) {
+				$match_query_params = false;
+				$matched_path       = preg_match( '@' . $from . '@i', $url );
+			}
+
 			if ( ! $matched_path ) {
 				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_url_no_query ) ) ? $normalized_requested_url_no_query : $normalized_requested_url;
 				$matched_path = $to_match === $from;
@@ -302,8 +356,15 @@ class Redirect_Txt_Redirects {
 
 			if ( $matched_path ) {
 				// Redirect to post.
-				if ( is_int( $to ) ) {
+				if ( 'id' === $to_type ) {
 					$to = get_permalink( $to );
+				}
+
+				// Regex URL.
+				if ( 'regex' === $from_type ) {
+					$to   = preg_replace( '@' . $from . '@i', $to, $url );
+					$to   = self::format_url( $to );
+					$from = $url;
 				}
 
 				/**
@@ -335,10 +396,12 @@ class Redirect_Txt_Redirects {
 
 				return [
 					'from'      => $from,
+					'from_type' => $from_type,
+					'from_rule' => $redirect['from'],
 					'to'        => $to,
+					'to_type'   => $to_type,
+					'to_rule'   => $redirect['to'],
 					'status'    => $redirect['status'],
-					'rule_from' => $redirect['from'],
-					'rule_to'   => $redirect['to'],
 				];
 			}
 		}
