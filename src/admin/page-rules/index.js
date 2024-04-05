@@ -8,8 +8,11 @@ import { ReactComponent as LoadingIcon } from '../../icons/loading.svg';
 import Editor from '../../components/editor';
 import Button from '../../components/button';
 
+const isMac = window.navigator.platform.indexOf('Mac') > -1;
+
 export default function PageRules() {
 	const [pendingRules, setPendingRules] = useState('');
+	const [savingRules, setSavingRules] = useState(false);
 	const [rulesChanged, setRulesChanged] = useState(false);
 
 	const { updateRules } = useDispatch('redirect-txt/rules');
@@ -33,6 +36,31 @@ export default function PageRules() {
 	useEffect(() => {
 		setRulesChanged(rules !== pendingRules);
 	}, [rules, pendingRules]);
+
+	// Save when CMD+S pressed.
+	useEffect(() => {
+		if (savingRules) {
+			setSavingRules(false);
+
+			if (rulesChanged) {
+				updateRules(pendingRules);
+			}
+		}
+	}, [pendingRules, rulesChanged, savingRules, updateRules]);
+
+	useEffect(() => {
+		const handle = (e) => {
+			const metaKey = isMac ? e.metaKey : e.ctrlKey;
+
+			if (e.key === 's' && metaKey) {
+				e.preventDefault();
+				setSavingRules(true);
+			}
+		};
+
+		document.addEventListener('keydown', handle);
+		return () => document.removeEventListener('keydown', handle);
+	}, []);
 
 	return (
 		<>
