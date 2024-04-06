@@ -59,7 +59,7 @@ class Redirect_Txt_Logs {
 
 		array_unshift( $logs, $new_log );
 
-		update_option( 'redirect_txt_logs', $logs );
+		update_option( 'redirect_txt_logs', $logs, false );
 	}
 
 	/**

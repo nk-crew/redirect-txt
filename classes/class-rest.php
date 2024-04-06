@@ -87,7 +87,7 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 		$new_rules = $req->get_param( 'rules' );
 
 		if ( isset( $new_rules ) ) {
-			update_option( 'redirect_txt_rules', sanitize_textarea_field( $new_rules ) );
+			update_option( 'redirect_txt_rules', sanitize_textarea_field( $new_rules ), false );
 		}
 
 		return $this->success( true );
@@ -118,7 +118,7 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 
 		if ( is_array( $new_settings ) ) {
 			$current_settings = get_option( 'redirect_txt_settings', [] );
-			update_option( 'redirect_txt_settings', array_merge( $current_settings, $new_settings ) );
+			update_option( 'redirect_txt_settings', array_merge( $current_settings, $new_settings ), false );
 		}
 
 		return $this->success( true );
