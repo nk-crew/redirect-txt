@@ -8,6 +8,7 @@ import { __ } from '@wordpress/i18n';
  */
 import PageRules from '../page-rules';
 import PageLogs from '../page-logs';
+import PageSettings from '../page-settings';
 
 export default {
 	rules: {
@@ -17,5 +18,9 @@ export default {
 	logs: {
 		label: __('Logs', 'redirect-txt'),
 		block: PageLogs,
+	},
+	settings: {
+		label: __('Settings', 'redirect-txt'),
+		block: PageSettings,
 	},
 };

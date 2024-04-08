@@ -113,6 +113,7 @@ class Redirect_Txt {
 	 * Include dependencies
 	 */
 	private function include_dependencies() {
+		require_once $this->plugin_path . 'classes/class-settings.php';
 		require_once $this->plugin_path . 'classes/class-admin.php';
 		require_once $this->plugin_path . 'classes/class-assets.php';
 		require_once $this->plugin_path . 'classes/class-rest.php';

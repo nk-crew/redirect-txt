@@ -1,0 +1,68 @@
+.redirect-txt-admin-content-settings {
+	max-width: 1000px;
+}
+
+.redirect-txt-admin-settings-card {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+
+	h2 {
+		display: block;
+		margin-top: 8px;
+		margin-bottom: 0;
+		font-size: 18px;
+		font-weight: 300;
+	}
+	.redirect-txt-admin-settings-card-description {
+		color: #3d3d3d;
+	}
+}
+
+.redirect-txt-admin-settings-single {
+	display: grid;
+	grid-template-columns: 110px 1fr;
+	gap: 12px;
+	flex: 1;
+	max-width: 400px;
+
+	label {
+		grid-column-start: 1;
+		display: block;
+		margin-top: 11px;
+		font-size: 14px;
+		font-weight: 400;
+		color: #1d2327;
+	}
+
+	.redirect-txt-admin-settings-single-description,
+	.redirect-txt-select,
+	.redirect-txt-input {
+		grid-column-start: 2;
+	}
+
+	.redirect-txt-admin-settings-single-description {
+		margin-top: -7px;
+		padding-left: 7px;
+		font-size: 12px;
+		color: #646464;
+	}
+}
+
+.redirect-txt-admin-settings-error {
+	padding: 20px;
+	margin-top: 20px;
+	margin-bottom: -20px;
+	background-color: var(--redirect-txt-error-light-color);
+	color: var(--redirect-txt-error-color);
+	border-left: 3px solid var(--redirect-txt-error-color);
+}
+.redirect-txt-admin-setting-error {
+	font-size: 12px;
+	margin-top: 2px;
+	color: var(--redirect-txt-error-color);
+}
+
+.redirect-txt-admin-settings-actions {
+	margin-top: 50px;
+}

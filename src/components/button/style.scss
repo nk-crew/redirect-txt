@@ -35,3 +35,12 @@
 		animation: 1s redirect-txt-settings-loading-icon infinite linear;
 	}
 }
+
+@keyframes redirect-txt-settings-loading-icon {
+	0% {
+		transform: rotate(0);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}

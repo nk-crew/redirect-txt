@@ -116,10 +116,7 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 	public function update_settings( WP_REST_Request $req ) {
 		$new_settings = $req->get_param( 'settings' );
 
-		if ( is_array( $new_settings ) ) {
-			$current_settings = get_option( 'redirect_txt_settings', [] );
-			update_option( 'redirect_txt_settings', array_merge( $current_settings, $new_settings ), false );
-		}
+		Redirect_Txt_Settings::update( $new_settings );
 
 		return $this->success( true );
 	}

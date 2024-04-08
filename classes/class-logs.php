@@ -13,16 +13,92 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Redirect_Txt_Logs class.
  */
 class Redirect_Txt_Logs {
+	const DELETE_HOOK = 'redirect_txt_flush_logs';
+
 	/**
-	 * Redirect_Txt_Logs constructor.
+	 * Init.
 	 */
-	public function __construct() {
+	public static function init() {
+		add_filter(
+			'redirect_txt_update_settings',
+			function ( $settings ) {
+				Redirect_Txt_Logs::flush_logs_schedule();
+
+				return $settings;
+			}
+		);
+		add_action( self::DELETE_HOOK, 'Redirect_Txt_Logs::flush_logs' );
+		add_action( 'admin_init', 'Redirect_Txt_Logs::flush_logs_schedule' );
+
 		if ( is_admin() || defined( 'WP_CLI' ) && WP_CLI ) {
 			return;
 		}
 
-		add_action( 'template_redirect', [ $this, 'maybe_log_404' ], 1 );
-		add_action( 'redirect_txt_redirect_hit', [ $this, 'log_redirect' ], 10, 2 );
+		add_action( 'template_redirect', 'Redirect_Txt_Logs::maybe_log_404', 1 );
+		add_action( 'redirect_txt_redirect_hit', 'Redirect_Txt_Logs::log_redirect', 10, 2 );
+	}
+
+	/**
+	 * Flush logs.
+	 */
+	public static function flush_logs() {
+		$settings = Redirect_Txt_Settings::get();
+
+		if ( $settings['redirect_logs'] >= 0 || $settings['404_logs'] >= 0 ) {
+			$logs = self::get_logs();
+			$time = time();
+
+			$new_logs = array_filter(
+				$logs,
+				function( $log ) use ( &$settings, &$time ) {
+					if ( 404 === $log['status'] && $settings['404_logs'] >= 0 ) {
+						return $log['timestamp'] + DAY_IN_SECONDS * $settings['404_logs'] > $time;
+					} elseif ( $settings['redirect_logs'] >= 0 ) {
+						return $log['timestamp'] + DAY_IN_SECONDS * $settings['redirect_logs'] > $time;
+					}
+
+					return true;
+				}
+			);
+
+			if ( count( $logs ) !== count( $new_logs ) ) {
+				self::update_logs( $new_logs );
+			}
+		}
+	}
+
+	/**
+	 * Schedule flush logs.
+	 */
+	public static function flush_logs_schedule() {
+		$freq     = 'daily';
+		$settings = Redirect_Txt_Settings::get();
+
+		if ( $settings['redirect_logs'] >= 0 || $settings['404_logs'] >= 0 ) {
+			if ( ! wp_next_scheduled( self::DELETE_HOOK ) ) {
+				wp_schedule_event( time(), $freq, self::DELETE_HOOK );
+			}
+		} else {
+			wp_clear_scheduled_hook( self::DELETE_HOOK );
+		}
+	}
+
+	/**
+	 * Get logs.
+	 *
+	 * @return array
+	 */
+	public static function get_logs() {
+		return get_option( 'redirect_txt_logs', array() );
+	}
+
+	/**
+	 * Update logs.
+	 *
+	 * @param array $logs - logs to save.
+	 */
+	public static function update_logs( $logs ) {
+		update_option( 'redirect_txt_logs', $logs, false );
 	}
 
 	/**
@@ -30,7 +106,7 @@ class Redirect_Txt_Logs {
 	 *
 	 * @param array $data - data for log.
 	 */
-	public function store_log( $data ) {
+	public static function store_log( $data ) {
 		$new_log = array_merge(
 			// Defaults.
 			array(
@@ -51,7 +127,7 @@ class Redirect_Txt_Logs {
 			$data
 		);
 
-		$logs = get_option( 'redirect_txt_logs', array() );
+		$logs = self::get_logs();
 
 		if ( ! is_array( $logs ) ) {
 			$logs = array();
@@ -59,18 +135,25 @@ class Redirect_Txt_Logs {
 
 		array_unshift( $logs, $new_log );
 
-		update_option( 'redirect_txt_logs', $logs, false );
+		self::update_logs( $logs );
 	}
 
 	/**
 	 * Detect 404 and save logs.
 	 */
-	public function maybe_log_404() {
+	public static function maybe_log_404() {
 		if ( ! is_404() ) {
 			return;
 		}
 
-		$this->store_log(
+		$settings = Redirect_Txt_Settings::get();
+
+		// Skip if logs for 404 disabled in settings.
+		if ( ! $settings['404_logs'] ) {
+			return;
+		}
+
+		self::store_log(
 			array(
 				// phpcs:ignore
 				'url_from' => @strip_tags( $_SERVER['REQUEST_URI'] ),
@@ -84,8 +167,15 @@ class Redirect_Txt_Logs {
 	 *
 	 * @param array $redirect - redirect data.
 	 */
-	public function log_redirect( $redirect ) {
-		$this->store_log(
+	public static function log_redirect( $redirect ) {
+		$settings = Redirect_Txt_Settings::get();
+
+		// Skip if logs for redirects disabled in settings.
+		if ( ! $settings['redirect_logs'] ) {
+			return;
+		}
+
+		self::store_log(
 			array(
 				'url_from'  => $redirect['from'],
 				'url_to'    => $redirect['to'],
@@ -99,4 +189,4 @@ class Redirect_Txt_Logs {
 	}
 }
 
-new Redirect_Txt_Logs();
+Redirect_Txt_Logs::init();

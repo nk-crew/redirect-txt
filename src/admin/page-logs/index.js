@@ -11,13 +11,27 @@ import TimeAgo from '../../components/time-ago';
 const { adminUrl } = window.redirectTxtAdminData;
 
 export default function PageLogs() {
-	const { logs } = useSelect((select) => {
-		const logsSelect = select('redirect-txt/logs');
+	const { settings } = useSelect((select) => {
+		const settingsSelect = select('redirect-txt/settings');
 
 		return {
-			logs: logsSelect.getLogs(),
+			settings: settingsSelect.getSettings(),
 		};
 	});
+
+	const enabledRedirectLogs = settings?.redirect_logs || 0;
+	const enabled404Logs = settings?.['404_logs'] || 0;
+
+	const { logs } = useSelect(
+		(select) => {
+			const logsSelect = select('redirect-txt/logs');
+
+			return {
+				logs: logsSelect.getLogs(enabledRedirectLogs, enabled404Logs),
+			};
+		},
+		[enabledRedirectLogs, enabled404Logs]
+	);
 
 	return (
 		<div className="redirect-txt-admin-logs-card">
@@ -142,7 +156,14 @@ export default function PageLogs() {
 					</table>
 				</div>
 			) : (
-				<p>{__('There are no logs available yet.', 'redirect-txt')}</p>
+				<p>
+					{enabledRedirectLogs || enabled404Logs
+						? __('There are no logs available yet.', 'redirect-txt')
+						: __(
+								'Open settings and enable logs for redirects and 404 errors to start collecting them.',
+								'redirect-txt'
+							)}
+				</p>
 			)}
 		</div>
 	);

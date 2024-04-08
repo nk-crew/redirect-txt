@@ -68,8 +68,8 @@ class Redirect_Txt_Assets {
 				'adminUrl' => admin_url(),
 				'homeUrl'  => home_url(),
 				'rules'    => get_option( 'redirect_txt_rules', '' ),
-				'settings' => get_option( 'redirect_txt_settings', array() ),
-				'logs'     => get_option( 'redirect_txt_logs', array() ),
+				'settings' => Redirect_Txt_Settings::get(),
+				'logs'     => Redirect_Txt_Logs::get_logs(),
 			]
 		);
 
