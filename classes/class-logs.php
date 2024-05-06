@@ -119,10 +119,8 @@ class Redirect_Txt_Logs {
 				'to_type'    => null,
 				// phpcs:ignore
 				'timestamp'  => current_time( 'timestamp' ),
-				// phpcs:ignore
-				'user_agent' => @strip_tags( $_SERVER['HTTP_USER_AGENT'] ),
-				// phpcs:ignore
-				'referrer'   => @strip_tags( $_SERVER['HTTP_REFERER'] ),
+				'user_agent' => isset( $_SERVER['HTTP_USER_AGENT'] ) && is_string( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ) : '',
+				'referrer'   => isset( $_SERVER['HTTP_REFERER'] ) && is_string( $_SERVER['HTTP_REFERER'] ) ? sanitize_text_field( $_SERVER['HTTP_REFERER'] ) : '',
 			),
 			$data
 		);
@@ -156,7 +154,7 @@ class Redirect_Txt_Logs {
 		self::store_log(
 			array(
 				// phpcs:ignore
-				'url_from' => @strip_tags( $_SERVER['REQUEST_URI'] ),
+				'url_from' => isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( $_SERVER['REQUEST_URI'] ) : '',
 				'status'   => 404,
 			)
 		);
