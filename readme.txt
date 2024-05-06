@@ -2,7 +2,7 @@
 Contributors:      nko
 Tags:              301, 404, redirect, redirection, redirects
 Requires at least: 6.2
-Tested up to:      6.4
+Tested up to:      6.5
 Requires PHP:      7.2
 Stable tag:        0.1.0
 License:           GPL-2.0-or-later
@@ -17,6 +17,10 @@ With Redirect.txt, you can provide a simple list of URLs and their destinations 
 There are many good redirect plugins that have been developed for years and have a strong code base. But we don't like the idea of creating separate posts/entries for each redirection rule. We simply need to add, remove, and manage redirects in a simple and bulk way.
 
 .htaccess and nginx configs are OK, but we don't want to edit configs placed somewhere in server directories; we want to open our admin panel and add redirects easily. We also don't care about wrong config configurations, which will stop your server.
+
+=== Quick Links ===
+
+[GitHub](https://github.com/nk-crew/redirect-txt)
 
 === Features ===
 
