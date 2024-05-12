@@ -35,38 +35,34 @@ There are many good redirect plugins that have been developed for years and have
 
 Open `Tools → Redirect.txt` and provide a list of URLs here. Here is an example of available syntax:
 
-```
-# The links below will automatically use 301 redirects.
-/hello: /new-hello
+	# The links below will automatically use 301 redirects.
+	/hello: /new-hello
 
-# Support for custom status
-# To make 301, 302, 303, 307, or 308 redirects, use a code like this:
-308: # All redirections below will use 308 redirect status.
+	# Support for custom status
+	# To make 301, 302, 303, 307, or 308 redirects, use a code like this:
+	308: # All redirections below will use 308 redirect status.
 
-# Support for post ID's
-# Redirect from post with ID 1 to post with ID 8:
-1: 8
+	# Support for post ID's
+	# Redirect from post with ID 1 to post with ID 8:
+	1: 8
 
-# Support for external redirects:
-/external: https://google.com/
+	# Support for external redirects:
+	/external: https://google.com/
 
-# Support for RegEx redirects (automatically detected when the string starts with ^):
-^/news/(.*): /blog/$1
+	# Support for RegEx redirects (automatically detected when the string starts with ^):
+	^/news/(.*): /blog/$1
 
-# You can use as many comments as you want to categorize your links better.
-```
+	# You can use as many comments as you want to categorize your links better.
 
 The same rules without comments:
 
-```
-/hello: /new-hello
+	/hello: /new-hello
 
-308:
+	308:
 
-1: 8
-/external: https://google.com/
-^/news/(.*): /blog/$1
-```
+	1: 8
+	/external: https://google.com/
+	^/news/(.*): /blog/$1
 
 == Screenshots ==
 
