@@ -5,6 +5,7 @@
 /.wordpress-org
 /node_modules
 /src
+/tests
 /vendor
 
 # Files to ignore
@@ -12,11 +13,14 @@
 /babel.config.js
 /composer.json
 /composer.lock
+/gulpfile.js
 /LICENSE.md
 /package.json
 /package-lock.json
 /phpcs.xml
 /phpcs.xml.dist
 /phpunit.xml
+/phpunit.xml.dist
 /README.md
+/redirect-txt.zip
 /webpack.config.js
