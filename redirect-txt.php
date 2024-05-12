@@ -4,7 +4,7 @@
  * Description:       A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest.
  * Requires at least: 6.2
  * Requires PHP:      7.2
- * Version:           0.1.0
+ * Version:           0.2.0
  * Author:            Redirect.txt Team
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'REDIRECT_TXT_VERSION' ) ) {
-	define( 'REDIRECT_TXT_VERSION', '0.1.1' );
+	define( 'REDIRECT_TXT_VERSION', '0.2.0' );
 }
 
 /**

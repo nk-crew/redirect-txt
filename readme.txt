@@ -4,7 +4,7 @@ Tags:              301, 404, redirect, redirection, redirects
 Requires at least: 6.2
 Tested up to:      6.5
 Requires PHP:      7.2
-Stable tag:        0.1.0
+Stable tag:        0.2.0
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,7 +35,7 @@ There are many good redirect plugins that have been developed for years and have
 
 Open `Tools → Redirect.txt` and provide a list of URLs here. Here is an example of available syntax:
 
-```yaml
+```
 # The links below will automatically use 301 redirects.
 /hello: /new-hello
 
@@ -58,7 +58,7 @@ Open `Tools → Redirect.txt` and provide a list of URLs here. Here is an exampl
 
 The same rules without comments:
 
-```yaml
+```
 /hello: /new-hello
 
 308:
@@ -67,6 +67,12 @@ The same rules without comments:
 /external: https://google.com/
 ^/news/(.*): /blog/$1
 ```
+
+== Screenshots ==
+
+1. Redirection rules list
+2. Redirection and 404 logs
+3. Settings
 
 == Installation ==
 
@@ -80,6 +86,6 @@ To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect
 
 == Changelog ==
 
-= 0.1.0 - 5 Apr, 2024 =
+= 0.2.0 - May 12, 2024 =
 
 - Release
