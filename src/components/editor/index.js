@@ -8,6 +8,7 @@ export default function Editor(props) {
 
 	return (
 		<CodeEditor
+			data-color-mode="light"
 			className={clsx('redirect-txt-editor', className)}
 			{...restProps}
 		/>
