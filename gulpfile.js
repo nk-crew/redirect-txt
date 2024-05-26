@@ -13,7 +13,7 @@ const bumpFiles = {
 	// Version in the package file.
 	'./package.json': /("version": ")[0-9][0-9.a-zA-Z-]*(",$)/gm,
 	// Version in the readme file.
-	'./readme.txt': /(^\* Stable tag: )[0-9][0-9.a-zA-Z-]*($)/gm,
+	'./readme.txt': /(^Stable tag: )[0-9][0-9.a-zA-Z-]*($)/gm,
 	'./redirect-txt.php': [
 		// Version in the file header.
 		/(\* Version:\s\s+)[0-9][0-9.a-zA-Z-]*($)/gm,
