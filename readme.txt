@@ -4,7 +4,7 @@ Tags: 301, 404, redirect, redirection, redirects
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 7.2
-Stable tag: 0.2.2
+Stable tag: 0.2.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,10 @@ Install the Redirect.txt either via the WordPress plugin directory or by uploadi
 To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect.txt and follow instructions.
 
 == Changelog ==
+
+= 0.2.3 - May 26, 2024 =
+
+- disable redirects from `wp-admin`, `wp-json` and `wp-login.php` paths
 
 = 0.2.2 - May 17, 2024 =
 
