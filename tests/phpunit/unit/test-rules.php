@@ -47,6 +47,29 @@ class RulesTest extends WP_UnitTestCase {
     }
 
     /**
+     * Test protected paths.
+	 *
+	 * We should not allow redirects from wp-admin pages, wp-json pages, and the login page.
+	 * Because we still need access to the WP admin and the REST API.
+     */
+    public function test_protected_paths() {
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-admin/'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-admin'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-admin/hello'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-adminhello'), false );
+
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-json/'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-json'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-json/hello'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-jsonhello'), false );
+
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-login.php'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-login.php?test=1'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-login.php/hello'), true );
+        $this->assertEquals( Redirect_Txt_Redirects::is_protected_path('/wp-login.phphello'), true );
+    }
+
+    /**
      * Test match URLs.
      */
     public function test_match_urls() {

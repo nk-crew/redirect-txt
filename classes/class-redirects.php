@@ -429,6 +429,44 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * Check if path is protected.
+	 * We have to skip the admin, login and rest paths.
+	 *
+	 * @param string $request - request path.
+	 *
+	 * @return bool
+	 */
+	public static function is_protected_path( $request ) {
+		$request = rtrim( $request, '/' );
+
+		$protected = apply_filters(
+			'redirect_txt_protected_paths',
+			[
+				'/wp-login.php',
+				'/wp-admin/',
+				'/wp-json/',
+			]
+		);
+
+		$not_protected = array_filter(
+			$protected,
+			function( $base ) use ( $request ) {
+				if (
+					$base === $request ||
+					rtrim( $base, '/' ) === $request ||
+					substr( $request, 0, strlen( $base ) ) === $base
+				) {
+					return true;
+				}
+
+				return false;
+			}
+		);
+
+		return ! empty( $not_protected );
+	}
+
+	/**
 	 * Check URL for available redirect and process it.
 	 *
 	 * @return void
@@ -440,6 +478,11 @@ class Redirect_Txt_Redirects {
 
 		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
 		$requested_url = untrailingslashit( stripslashes( $requested_url ) );
+
+		// Skip protected paths.
+		if ( self::is_protected_path( $requested_url ) ) {
+			return;
+		}
 
 		$match_redirect = self::match_redirect( $requested_url );
 
