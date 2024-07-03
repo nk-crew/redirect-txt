@@ -213,21 +213,6 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
-	 * Get redirects from DB and prepare array.
-	 *
-	 * @param bool $allow_url_only_redirects - allow redirecting using URLs only.
-	 * @param bool $allow_post_from - allow redirecting from post IDs.
-	 *
-	 * @return array
-	 */
-	public static function get_redirect_rules( $allow_url_only_redirects = true, $allow_post_from = false ) {
-		$rules = get_option( 'redirect_txt_rules', '' );
-
-		return self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
-	}
-
-
-	/**
 	 * Apply whitelisted host to allowed_redirect_hosts filter
 	 *
 	 * @param array $hosts Array of hosts.
