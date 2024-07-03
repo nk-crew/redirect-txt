@@ -1,6 +1,6 @@
 {
 	"name": "redirect-txt",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"description": "A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest.",
 	"author": "Redirect.txt Team",
 	"license": "GPL-2.0-or-later",
