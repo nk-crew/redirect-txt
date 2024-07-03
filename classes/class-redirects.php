@@ -139,8 +139,18 @@ class Redirect_Txt_Redirects {
 
 		if ( is_string( $rules ) && $rules ) {
 
-			// Remove comments.
-			$rules = preg_replace( '/#.*/', '', $rules );
+			/**
+			 * Remove comments, but keep hashes in links.
+			 *
+			 * This regex does two things:
+			 *  1. ^[ \t]*#.*$: Removes lines that start with a hash (optionally preceded by whitespace).
+			 *  2. (?<=\s)#.*$: Removes inline comments that start with a hash preceded by whitespace.
+			 *
+			 * Explanation of the new part:
+			 *  • (?<=\s): Positive lookbehind, ensures the hash is preceded by whitespace
+			 *  • #.*$: Matches the hash and everything after it until the end of the line
+			 */
+			$rules = preg_replace( '/^[ \t]*#.*$|(?<=\s)#.*$/m', '', $rules );
 
 			// Split string by lines.
 			$lines = preg_split( "/\r\n|\n|\r/", $rules );

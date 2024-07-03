@@ -207,24 +207,27 @@ class RulesTest extends WP_UnitTestCase {
 			/test/: /new-test/ # test comments here
 			test-2: new-test-2
 
+			# Hash support:
+			test-3: new-test-3#with-hash
+
 			# 308 redirects:
 			308:
-			test-3: new-test-3
+			test-4: new-test-4
 
 			# Post ID:
 			1: 4
 
 			# URL to Post ID:
-			test-4: 2
+			test-5: 2
 
 			# 302 redirects:
 			302:
 
 			# External URLs:
-			test-5: https://example.com/
+			test-6: https://example.com/
 
 			# RegEx support.
-			^/test-6/(.*): /new-test-6/$1
+			^/test-7/(.*): /new-test-7/$1
 
 			# You can use as many comments as you want to categorize your links better.
 		";
@@ -258,22 +261,27 @@ class RulesTest extends WP_UnitTestCase {
 				),
 				array(
 					'from'   => 'test-3',
-					'to'     => 'new-test-3',
-					'status' => 308,
+					'to'     => 'new-test-3#with-hash',
+					'status' => 301,
 				),
 				array(
 					'from'   => 'test-4',
-					'to'     => 2,
+					'to'     => 'new-test-4',
 					'status' => 308,
 				),
 				array(
 					'from'   => 'test-5',
+					'to'     => 2,
+					'status' => 308,
+				),
+				array(
+					'from'   => 'test-6',
 					'to'     => 'https://example.com/',
 					'status' => 302,
 				),
 				array(
-					'from'   => '^/test-6/(.*)',
-					'to'     => '/new-test-6/$1',
+					'from'   => '^/test-7/(.*)',
+					'to'     => '/new-test-7/$1',
 					'status' => 302,
 				),
 			)
