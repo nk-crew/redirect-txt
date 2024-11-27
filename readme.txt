@@ -2,9 +2,9 @@
 Contributors: nko
 Tags: 301, 404, redirect, redirection, redirects
 Requires at least: 6.2
-Tested up to: 6.5
+Tested up to: 6.7
 Requires PHP: 7.2
-Stable tag: 0.2.4
+Stable tag: 0.2.5
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,11 @@ Install the Redirect.txt either via the WordPress plugin directory or by uploadi
 To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect.txt and follow instructions.
 
 == Changelog ==
+
+= 0.2.5 - Nov 28, 2024 =
+
+- added translation file
+- check compatibility with WordPress 6.7
 
 = 0.2.4 - Jul 3, 2024 =
 
