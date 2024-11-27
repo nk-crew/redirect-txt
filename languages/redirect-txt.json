@@ -1,0 +1,124 @@
+{
+   "domain": "redirect-txt",
+   "locale_data": {
+      "redirect-txt": {
+         "": {
+            "domain": "redirect-txt"
+         },
+         "Redirect.txt": [
+            ""
+         ],
+         "A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest.": [
+            ""
+         ],
+         "Redirect.txt Team": [
+            ""
+         ],
+         "Moved Permanently": [
+            ""
+         ],
+         "Found": [
+            ""
+         ],
+         "See Other": [
+            ""
+         ],
+         "Temporary Redirect": [
+            ""
+         ],
+         "Permanent Redirect": [
+            ""
+         ],
+         "Forbidden": [
+            ""
+         ],
+         "Not Found": [
+            ""
+         ],
+         "Gone": [
+            ""
+         ],
+         "User don't have permissions to change options.": [
+            ""
+         ],
+         "Logs": [
+            ""
+         ],
+         "Status": [
+            ""
+         ],
+         "Rule / URL": [
+            ""
+         ],
+         "Referrer": [
+            ""
+         ],
+         "Date": [
+            ""
+         ],
+         "Post:": [
+            ""
+         ],
+         "There are no logs available yet.": [
+            ""
+         ],
+         "Open settings and enable logs for redirects and 404 errors to start collecting them.": [
+            ""
+         ],
+         "Redirect Rules": [
+            ""
+         ],
+         "Enter rules…": [
+            ""
+         ],
+         "Provide a list of all your redirect rules. Use a yaml-like format. Each redirect should be in a new line. Each redirect should have a source and a target separated by a colon. For example: /old-url: /new-url": [
+            ""
+         ],
+         "Save Changes": [
+            ""
+         ],
+         "Settings": [
+            ""
+         ],
+         "Redirect Logs:": [
+            ""
+         ],
+         "No logs": [
+            ""
+         ],
+         "A day": [
+            ""
+         ],
+         "A week": [
+            ""
+         ],
+         "A month": [
+            ""
+         ],
+         "Two months": [
+            ""
+         ],
+         "Three months": [
+            ""
+         ],
+         "Forever": [
+            ""
+         ],
+         "Time to keep redirect logs.": [
+            ""
+         ],
+         "404 Logs:": [
+            ""
+         ],
+         "Time to keep 404 error logs.": [
+            ""
+         ],
+         "Rules": [
+            ""
+         ],
+         "Something went wrong, please, try again…": [
+            ""
+         ]
+      }
+   }
+}

@@ -14,7 +14,7 @@
 	"scripts": {
 		"dev": "wp-scripts start -- inline --progress",
 		"build": "wp-scripts build --progress",
-		"build:prod": "npm run build && npm run plugin-zip",
+		"build:prod": "npm run make-pot && npm run make-json && npm run build && npm run plugin-zip",
 		"bump:patch": "gulp bump --type patch",
 		"bump:minor": "gulp bump --type minor",
 		"bump:major": "gulp bump --type major",
@@ -32,6 +32,8 @@
 		"lint:js": "wp-scripts lint-js",
 		"prelint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer install --no-interaction",
 		"lint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer run-script lint",
+		"make-pot": "composer wp -- i18n make-pot ./ ./languages/redirect-txt.pot --skip-audit --exclude=vendor,vendors,tests,node_modules,build,dist-zip --headers='{\"Last-Translator\":\"Lazy Blocks Team\",\"Report-Msgid-Bugs-To\":\"https://github.com/nk-crew/redirect-txt/issues\"}'",
+		"make-json": "po2json ./languages/redirect-txt.pot ./languages/redirect-txt.json --format=jed1.x --pretty --domain=redirect-txt",
 		"plugin-zip": "wp-scripts plugin-zip",
 		"packages-update": "wp-scripts packages-update",
 		"postinstall": "composer install"
@@ -53,6 +55,7 @@
 		"npm-run-all": "^4.1.5",
 		"parse-version-string": "^1.0.1",
 		"path": "^0.12.7",
+		"po2json": "^0.4.5",
 		"prettier": "^3.2.5",
 		"yargs": "^17.7.2"
 	},

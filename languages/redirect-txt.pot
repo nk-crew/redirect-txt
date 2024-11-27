@@ -1,0 +1,186 @@
+# Copyright (C) 2024 Redirect.txt Team
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Redirect.txt 0.2.4\n"
+"Report-Msgid-Bugs-To: https://github.com/nk-crew/redirect-txt/issues\n"
+"Last-Translator: Lazy Blocks Team\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2024-11-27T16:01:05+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.11.0\n"
+"X-Domain: redirect-txt\n"
+
+#. Plugin Name of the plugin
+#: redirect-txt.php
+#: classes/class-admin.php:37
+#: classes/class-admin.php:38
+#: src/admin/index.js:98
+msgid "Redirect.txt"
+msgstr ""
+
+#. Description of the plugin
+#: redirect-txt.php
+msgid "A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest."
+msgstr ""
+
+#. Author of the plugin
+#: redirect-txt.php
+msgid "Redirect.txt Team"
+msgstr ""
+
+#: classes/class-redirects.php:105
+msgid "Moved Permanently"
+msgstr ""
+
+#: classes/class-redirects.php:106
+msgid "Found"
+msgstr ""
+
+#: classes/class-redirects.php:107
+msgid "See Other"
+msgstr ""
+
+#: classes/class-redirects.php:108
+msgid "Temporary Redirect"
+msgstr ""
+
+#: classes/class-redirects.php:109
+msgid "Permanent Redirect"
+msgstr ""
+
+#: classes/class-redirects.php:110
+msgid "Forbidden"
+msgstr ""
+
+#: classes/class-redirects.php:111
+msgid "Not Found"
+msgstr ""
+
+#: classes/class-redirects.php:112
+msgid "Gone"
+msgstr ""
+
+#: classes/class-rest.php:73
+#: classes/class-rest.php:103
+msgid "User don't have permissions to change options."
+msgstr ""
+
+#: src/admin/page-logs/index.js:38
+#: src/admin/pages/index.js:19
+msgid "Logs"
+msgstr ""
+
+#: src/admin/page-logs/index.js:46
+msgid "Status"
+msgstr ""
+
+#: src/admin/page-logs/index.js:49
+msgid "Rule / URL"
+msgstr ""
+
+#: src/admin/page-logs/index.js:52
+msgid "Referrer"
+msgstr ""
+
+#: src/admin/page-logs/index.js:55
+msgid "Date"
+msgstr ""
+
+#: src/admin/page-logs/index.js:83
+#: src/admin/page-logs/index.js:110
+msgid "Post:"
+msgstr ""
+
+#: src/admin/page-logs/index.js:161
+msgid "There are no logs available yet."
+msgstr ""
+
+#: src/admin/page-logs/index.js:162
+msgid "Open settings and enable logs for redirects and 404 errors to start collecting them."
+msgstr ""
+
+#: src/admin/page-rules/index.js:68
+msgid "Redirect Rules"
+msgstr ""
+
+#: src/admin/page-rules/index.js:72
+msgid "Enter rules…"
+msgstr ""
+
+#: src/admin/page-rules/index.js:77
+msgid "Provide a list of all your redirect rules. Use a yaml-like format. Each redirect should be in a new line. Each redirect should have a source and a target separated by a colon. For example: /old-url: /new-url"
+msgstr ""
+
+#: src/admin/page-rules/index.js:95
+#: src/admin/page-settings/index.js:136
+msgid "Save Changes"
+msgstr ""
+
+#: src/admin/page-settings/index.js:42
+#: src/admin/pages/index.js:23
+msgid "Settings"
+msgstr ""
+
+#: src/admin/page-settings/index.js:46
+msgid "Redirect Logs:"
+msgstr ""
+
+#: src/admin/page-settings/index.js:60
+#: src/admin/page-settings/index.js:100
+msgid "No logs"
+msgstr ""
+
+#: src/admin/page-settings/index.js:62
+#: src/admin/page-settings/index.js:102
+msgid "A day"
+msgstr ""
+
+#: src/admin/page-settings/index.js:64
+#: src/admin/page-settings/index.js:104
+msgid "A week"
+msgstr ""
+
+#: src/admin/page-settings/index.js:67
+#: src/admin/page-settings/index.js:107
+msgid "A month"
+msgstr ""
+
+#: src/admin/page-settings/index.js:70
+#: src/admin/page-settings/index.js:110
+msgid "Two months"
+msgstr ""
+
+#: src/admin/page-settings/index.js:73
+#: src/admin/page-settings/index.js:113
+msgid "Three months"
+msgstr ""
+
+#: src/admin/page-settings/index.js:76
+#: src/admin/page-settings/index.js:116
+msgid "Forever"
+msgstr ""
+
+#: src/admin/page-settings/index.js:80
+msgid "Time to keep redirect logs."
+msgstr ""
+
+#: src/admin/page-settings/index.js:86
+msgid "404 Logs:"
+msgstr ""
+
+#: src/admin/page-settings/index.js:120
+msgid "Time to keep 404 error logs."
+msgstr ""
+
+#: src/admin/pages/index.js:15
+msgid "Rules"
+msgstr ""
+
+#: src/admin/store/rules/actions.js:31
+#: src/admin/store/settings/actions.js:35
+msgid "Something went wrong, please, try again…"
+msgstr ""
