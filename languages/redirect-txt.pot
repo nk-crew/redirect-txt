@@ -1,21 +1,21 @@
-# Copyright (C) 2024 Redirect.txt Team
+# Copyright (C) 2026 Redirect.txt Team
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Redirect.txt 0.2.5\n"
+"Project-Id-Version: Redirect.txt 0.2.6\n"
 "Report-Msgid-Bugs-To: https://github.com/nk-crew/redirect-txt/issues\n"
 "Last-Translator: Lazy Blocks Team\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2024-11-27T16:02:25+00:00\n"
+"POT-Creation-Date: 2026-06-10T08:22:40+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"X-Generator: WP-CLI 2.11.0\n"
+"X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: redirect-txt\n"
 
 #. Plugin Name of the plugin
-#: redirect-txt.php
+#: redirect-txt.php:3
 #: classes/class-admin.php:37
 #: classes/class-admin.php:38
 #: src/admin/index.js:98
@@ -23,12 +23,12 @@ msgid "Redirect.txt"
 msgstr ""
 
 #. Description of the plugin
-#: redirect-txt.php
+#: redirect-txt.php:4
 msgid "A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest."
 msgstr ""
 
 #. Author of the plugin
-#: redirect-txt.php
+#: redirect-txt.php:8
 msgid "Redirect.txt Team"
 msgstr ""
 
