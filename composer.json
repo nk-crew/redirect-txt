@@ -19,6 +19,9 @@
 		"wp": "\"vendor/wp-cli/wp-cli/bin/wp\""
 	},
 	"config": {
-		"allow-plugins": true
+		"allow-plugins": true,
+		"platform": {
+			"php": "7.4"
+		}
 	}
 }
