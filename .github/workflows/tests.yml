@@ -106,6 +106,9 @@ jobs:
           docker -v
           docker compose version
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y subversion
+
       - name: General debug information
         run: |
           npm --version

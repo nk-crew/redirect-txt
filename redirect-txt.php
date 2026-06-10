@@ -3,7 +3,7 @@
  * Plugin Name:       Redirect.txt
  * Description:       A simple yet powerful redirection plugin. Provide a simple list of URLs and their destinations, and Redirect.txt will take care of the rest.
  * Requires at least: 6.2
- * Requires PHP:      7.2
+ * Requires PHP:      7.4
  * Version:           0.2.5
  * Author:            Redirect.txt Team
  * License:           GPLv2 or later
