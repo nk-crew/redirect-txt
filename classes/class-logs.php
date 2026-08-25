@@ -30,7 +30,7 @@ class Redirect_Txt_Logs {
 		add_action( self::DELETE_HOOK, 'Redirect_Txt_Logs::flush_logs' );
 		add_action( 'admin_init', 'Redirect_Txt_Logs::flush_logs_schedule' );
 
-		if ( is_admin() || defined( 'WP_CLI' ) && WP_CLI ) {
+		if ( is_admin() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
 			return;
 		}
 
@@ -50,7 +50,7 @@ class Redirect_Txt_Logs {
 
 			$new_logs = array_filter(
 				$logs,
-				function( $log ) use ( &$settings, &$time ) {
+				function ( $log ) use ( &$settings, &$time ) {
 					if ( 404 === $log['status'] && $settings['404_logs'] >= 0 ) {
 						return $log['timestamp'] + DAY_IN_SECONDS * $settings['404_logs'] > $time;
 					} elseif ( $settings['redirect_logs'] >= 0 ) {
