@@ -24,7 +24,7 @@ class Redirect_Txt_Redirects {
 	 * Redirect_Txt_Redirects constructor.
 	 */
 	public static function init() {
-		if ( is_admin() || defined( 'WP_CLI' ) && WP_CLI ) {
+		if ( is_admin() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
 			return;
 		}
 
@@ -417,7 +417,7 @@ class Redirect_Txt_Redirects {
 		// Allow redirects from post IDs.
 		// `$wp_query` is available in the `wp` hook only.
 		$allow_url_only_redirects = current_action() !== 'wp';
-		$allow_post_from          = ! ! $wp_query->get_queried_object();
+		$allow_post_from          = (bool) $wp_query->get_queried_object();
 		$rules                    = get_option( 'redirect_txt_rules', '' );
 
 		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from );
@@ -445,7 +445,7 @@ class Redirect_Txt_Redirects {
 
 		$not_protected = array_filter(
 			$protected,
-			function( $base ) use ( $request ) {
+			function ( $base ) use ( $request ) {
 				if (
 					$base === $request ||
 					rtrim( $base, '/' ) === $request ||

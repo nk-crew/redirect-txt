@@ -64,7 +64,8 @@
 			<property name="allowUnusedParametersBeforeUsed" value="true"/>
 		</properties>
 	</rule>
-	<rule ref="WordPress.CodeAnalysis.EmptyStatement"/>
+	<!-- Renamed in WPCS 3.0; the sniff now lives upstream in PHPCS itself. -->
+	<rule ref="Generic.CodeAnalysis.EmptyPHPStatement"/>
 
 	<!--
 	#############################################################################
@@ -85,7 +86,13 @@
 
 	<!-- Allow arrays short syntax -->
 	<rule ref="WordPress-Extra">
-		<exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+		<!-- Renamed in WPCS 3.0, which took the sniff from PHPCSExtra. -->
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+	</rule>
+
+	<!-- The entry file has to hold both the bootstrap class and its accessor: the class reads its own paths from __FILE__. -->
+	<rule ref="Universal.Files.SeparateFunctionsFromOO">
+		<exclude-pattern>/redirect-txt\.php$</exclude-pattern>
 	</rule>
 
 	<!-- Verify that everything in the global namespace is prefixed with a theme specific prefix.

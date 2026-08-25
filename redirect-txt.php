@@ -96,7 +96,7 @@ class Redirect_Txt {
 	 */
 	public function init_hook() {
 		// load textdomain.
-		load_plugin_textdomain( 'redirect-txt', false, basename( dirname( __FILE__ ) ) . '/languages' );
+		load_plugin_textdomain( 'redirect-txt', false, basename( __DIR__ ) . '/languages' );
 	}
 
 	/**
