@@ -4,7 +4,7 @@ Tags: 301, 404, redirect, redirection, redirects
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.7
+Stable tag: 0.2.8
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,14 @@ Install the Redirect.txt either via the WordPress plugin directory or by uploadi
 To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect.txt and follow instructions.
 
 == Changelog ==
+
+= 0.2.8 - Sep 23, 2026 =
+
+- fixed redirects dropping the trailing slash and letter case written in the target URL
+- fixed an endless loop when a redirect points a page to itself, such as `/about: /about/`
+- fixed redirects from or to the homepage `/` not working
+- fixed path redirects not working when WordPress is installed in a subdirectory
+- fixed RegEx redirects that contain `@` not working
 
 = 0.2.7 - Aug 26, 2026 =
 
