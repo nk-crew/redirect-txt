@@ -21,6 +21,16 @@ class Redirect_Txt_Redirects {
 	public static $whitelist_host;
 
 	/**
+	 * True while checking whether an earlier rule would catch the next request.
+	 *
+	 * The check calls match_url_to_rules again. Without this it would decide
+	 * the inner call is a loop and never see the earlier rule.
+	 *
+	 * @var bool
+	 */
+	private static $checking_repeat = false;
+
+	/**
 	 * Redirect_Txt_Redirects constructor.
 	 */
 	public static function init() {
@@ -125,7 +135,15 @@ class Redirect_Txt_Redirects {
 			return $url;
 		}
 
-		return strtolower( rtrim( $url, '/' ) );
+		$url = strtolower( rtrim( $url, '/' ) );
+
+		// rtrim turns the homepage into ''. A request for `/` is not empty, so the
+		// two sides would never be equal and `/: /hello` would match nothing.
+		if ( '' === $url ) {
+			return '/';
+		}
+
+		return $url;
 	}
 
 	/**
@@ -142,6 +160,377 @@ class Redirect_Txt_Redirects {
 	 */
 	public static function format_target_url( $url ) {
 		return self::normalize_url( $url );
+	}
+
+	/**
+	 * Home path when WordPress is installed in a subdirectory, without a trailing slash.
+	 *
+	 * Empty at the domain root, where the request path and a rule path already agree.
+	 *
+	 * @return string
+	 */
+	private static function home_path_prefix() {
+		if ( function_exists( 'wp_parse_url' ) ) {
+			$parsed = wp_parse_url( home_url() );
+		} else {
+			$parsed = parse_url( home_url() ); // phpcs:ignore
+		}
+
+		if ( empty( $parsed['path'] ) || '/' === $parsed['path'] ) {
+			return '';
+		}
+
+		return untrailingslashit( $parsed['path'] );
+	}
+
+	/**
+	 * Drop the subdirectory prefix from a request or a `from` path.
+	 *
+	 * Only a real prefix counts. A home path of `/blog` must not eat the same
+	 * segment out of `/2024/blog/post`. The target is not passed through here:
+	 * a Location that starts with `/` is host-absolute, so it still needs the prefix.
+	 *
+	 * @param string $url Path, optionally with a query.
+	 * @return string
+	 */
+	private static function strip_home_path( $url ) {
+		$prefix = self::home_path_prefix();
+
+		if ( '' === $prefix ) {
+			return $url;
+		}
+
+		$stripped = preg_replace( '#^' . preg_quote( $prefix, '#' ) . '(?=/|$|\?)#i', '', $url, 1 );
+
+		if ( null === $stripped || '' === $stripped ) {
+			return '/';
+		}
+
+		if ( '?' === $stripped[0] ) {
+			return '/' . $stripped;
+		}
+
+		return $stripped;
+	}
+
+	/**
+	 * Delimiter that is not already inside the pattern, plus the case flag.
+	 *
+	 * The pattern is a user string. Wrapping it in `@` makes a pattern that
+	 * contains `@` fail with "Unknown modifier".
+	 *
+	 * @param string $pattern Regular expression without delimiters.
+	 * @return string
+	 */
+	private static function delimited_pattern( $pattern ) {
+		$delimiters = array( '#', '~', '!', '%', '`', "\x01" );
+
+		foreach ( $delimiters as $delimiter ) {
+			if ( false === strpos( $pattern, $delimiter ) ) {
+				return $delimiter . $pattern . $delimiter . 'i';
+			}
+		}
+
+		return "\x01" . $pattern . "\x01i";
+	}
+
+	/**
+	 * A 3xx sends a Location. The 4xx codes are answers, not redirects.
+	 *
+	 * @param int $status HTTP status from the rule.
+	 * @return bool
+	 */
+	private static function sends_location( $status ) {
+		return ! in_array( (int) $status, array( 403, 404, 410 ), true );
+	}
+
+	/**
+	 * Host, ignoring a leading www so it matches the redirect whitelist.
+	 *
+	 * @param string $host Hostname.
+	 * @return string
+	 */
+	private static function bare_host( $host ) {
+		$host = strtolower( $host );
+
+		if ( 0 === strpos( $host, 'www.' ) ) {
+			return substr( $host, 4 );
+		}
+
+		return $host;
+	}
+
+	/**
+	 * Port the URL is served on, including the scheme default.
+	 *
+	 * @param array $parts Parsed URL.
+	 * @return int
+	 */
+	private static function url_port( $parts ) {
+		if ( isset( $parts['port'] ) ) {
+			return (int) $parts['port'];
+		}
+
+		if ( isset( $parts['scheme'] ) && 'https' === strtolower( $parts['scheme'] ) ) {
+			return 443;
+		}
+
+		return 80;
+	}
+
+	/**
+	 * Whether a path is the install, or sits under its subdirectory.
+	 *
+	 * @param string $path Path, without a query.
+	 * @return bool
+	 */
+	private static function path_is_inside_home( $path ) {
+		$prefix = self::home_path_prefix();
+
+		if ( '' === $prefix ) {
+			return true;
+		}
+
+		if ( 0 !== stripos( $path, $prefix ) ) {
+			return false;
+		}
+
+		$rest = substr( $path, strlen( $prefix ) );
+
+		return '' === $rest || '/' === $rest[0];
+	}
+
+	/**
+	 * Path and query of a Location that points at this site.
+	 *
+	 * Null when the next request would not hit this install: another host, another
+	 * port, or a path outside the subdirectory. The fragment is dropped because
+	 * the browser does not send it.
+	 *
+	 * @param string $url Location or path.
+	 * @return string|null
+	 */
+	private static function location_on_this_site( $url ) {
+		$hash = strpos( $url, '#' );
+
+		if ( false !== $hash ) {
+			$url = substr( $url, 0, $hash );
+		}
+
+		if ( ! self::is_absolute_url( $url ) ) {
+			return $url;
+		}
+
+		$parts = wp_parse_url( $url );
+		$home  = wp_parse_url( home_url() );
+
+		if ( empty( $parts['host'] ) || empty( $home['host'] ) ) {
+			return null;
+		}
+
+		if ( self::bare_host( $parts['host'] ) !== self::bare_host( $home['host'] ) ) {
+			return null;
+		}
+
+		// 80 and 443 with no port written in the URL are the same install seen
+		// over http and https. An explicit port, such as :8443, is another listener.
+		$target_has_port = isset( $parts['port'] );
+		$home_has_port   = isset( $home['port'] );
+
+		if ( ( $target_has_port || $home_has_port ) && self::url_port( $parts ) !== self::url_port( $home ) ) {
+			return null;
+		}
+
+		$path = isset( $parts['path'] ) ? $parts['path'] : '/';
+
+		if ( ! self::path_is_inside_home( $path ) ) {
+			return null;
+		}
+
+		if ( ! empty( $parts['query'] ) ) {
+			$path .= '?' . $parts['query'];
+		}
+
+		return $path;
+	}
+
+	/**
+	 * Key the matcher compares: lower case, no trailing slash, query kept, fragment gone.
+	 *
+	 * @param string $url Path, optionally with a query.
+	 * @return string
+	 */
+	private static function match_key( $url ) {
+		$query     = '';
+		$query_pos = strpos( $url, '?' );
+
+		if ( false !== $query_pos ) {
+			$query = strtolower( substr( $url, $query_pos ) );
+			$url   = substr( $url, 0, $query_pos );
+		}
+
+		$url = strtolower( untrailingslashit( $url ) );
+
+		if ( '' === $url ) {
+			$url = '/';
+		}
+
+		return $url . $query;
+	}
+
+	/**
+	 * Key of a Location on this site, or null when it leaves the site.
+	 *
+	 * @param string $url Location or path.
+	 * @return string|null
+	 */
+	private static function on_site_key( $url ) {
+		$relative = self::location_on_this_site( $url );
+
+		if ( null === $relative ) {
+			return null;
+		}
+
+		return self::match_key( self::strip_home_path( $relative ) );
+	}
+
+	/**
+	 * True when both keys are the same request this rule would match again.
+	 *
+	 * A `from` that contains a query only matches that query. A `from` that does
+	 * not ignores the query, so a target that only adds one is the same path.
+	 *
+	 * @param string $from_key Match key of the rule.
+	 * @param string $to_key   Match key of the Location.
+	 * @return bool
+	 */
+	private static function keys_repeat( $from_key, $to_key ) {
+		if ( false !== strpos( $from_key, '?' ) ) {
+			return $from_key === $to_key;
+		}
+
+		$from_path = strstr( $from_key, '?', true );
+		$to_path   = strstr( $to_key, '?', true );
+
+		if ( false === $from_path ) {
+			$from_path = $from_key;
+		}
+
+		if ( false === $to_path ) {
+			$to_path = $to_key;
+		}
+
+		return $from_path === $to_path;
+	}
+
+	/**
+	 * A regex whose replacement, requested again, replaces to the same Location.
+	 *
+	 * @param string $pattern     Pattern as written.
+	 * @param string $replacement Replacement as written.
+	 * @param string $to          Location this request would send.
+	 * @return bool
+	 */
+	private static function regex_target_repeats( $pattern, $replacement, $to ) {
+		$next = self::location_on_this_site( $to );
+
+		if ( null === $next ) {
+			return false;
+		}
+
+		$next = untrailingslashit( self::strip_home_path( $next ) );
+
+		// The matcher turns that empty string back into `/` before the pattern runs.
+		if ( '' === $next ) {
+			$next = '/';
+		}
+
+		$delimited = self::delimited_pattern( $pattern );
+
+		if ( ! preg_match( $delimited, $next ) ) {
+			return false;
+		}
+
+		$next_to  = self::format_target_url( preg_replace( $delimited, $replacement, $next ) );
+		$next_key = self::on_site_key( $next_to );
+		$to_key   = self::on_site_key( $to );
+
+		if ( null === $next_key || null === $to_key ) {
+			return false;
+		}
+
+		return $next_key === $to_key;
+	}
+
+	/**
+	 * The next request would hit this same rule and get this same Location.
+	 *
+	 * @param string $from_type url, regex, or id.
+	 * @param string $from      Match key, pattern, or permalink.
+	 * @param string $raw_to    Target as written. Regex replacements need this.
+	 * @param string $to        Location this request would send.
+	 * @return bool
+	 */
+	private static function target_repeats( $from_type, $from, $raw_to, $to ) {
+		if ( 'regex' === $from_type ) {
+			return self::regex_target_repeats( $from, $raw_to, $to );
+		}
+
+		$to_key = self::on_site_key( $to );
+
+		if ( null === $to_key ) {
+			return false;
+		}
+
+		if ( 'id' === $from_type ) {
+			$from_key = self::on_site_key( $from );
+
+			return null !== $from_key && self::keys_repeat( $from_key, $to_key );
+		}
+
+		return self::keys_repeat( $from, $to_key );
+	}
+
+	/**
+	 * An earlier rule matches the Location this rule would send.
+	 *
+	 * That request never comes back to this rule, so the redirect is a chain.
+	 *
+	 * @param array  $earlier  Rules parsed before this one.
+	 * @param string $location Location this rule would send.
+	 * @return bool
+	 */
+	private static function earlier_rule_matches( $earlier, $location ) {
+		if ( empty( $earlier ) ) {
+			return false;
+		}
+
+		$next = self::location_on_this_site( $location );
+
+		if ( null === $next ) {
+			return false;
+		}
+
+		// maybe_process_redirect strips the slash before this matcher runs.
+		$next = untrailingslashit( $next );
+
+		if ( '' === $next ) {
+			$next = '/';
+		}
+
+		$lines  = array();
+		$status = null;
+
+		foreach ( $earlier as $rule ) {
+			if ( $status !== (int) $rule['status'] ) {
+				$status  = (int) $rule['status'];
+				$lines[] = $status . ':';
+			}
+
+			$lines[] = $rule['from'] . ': ' . $rule['to'];
+		}
+
+		return false !== self::match_url_to_rules( $next, implode( "\n", $lines ) );
 	}
 
 	/**
@@ -298,20 +687,13 @@ class Redirect_Txt_Redirects {
 		}
 
 		/**
-		 * If WordPress resides in a directory that is not the public root, we have to chop
-		 * the pre-WP path off the requested path.
+		 * If WordPress resides in a directory that is not the public root, chop that
+		 * prefix off the requested path. The same prefix is removed from a plain `from`
+		 * below, so the two sides still meet. Only a real prefix is removed.
 		 */
-		if ( function_exists( 'wp_parse_url' ) ) {
-			$parsed_home_url = wp_parse_url( home_url() );
-		} else {
-			$parsed_home_url = parse_url( home_url() ); // phpcs:ignore
-		}
+		$url = self::strip_home_path( $url );
 
-		if ( isset( $parsed_home_url['path'] ) && '/' !== $parsed_home_url['path'] ) {
-			$url = preg_replace( '@' . $parsed_home_url['path'] . '@i', '', $url, 1 );
-		}
-
-		if ( empty( $url ) ) {
+		if ( '' === $url ) {
 			$url = '/';
 		}
 
@@ -331,6 +713,11 @@ class Redirect_Txt_Redirects {
 
 		if ( ! empty( $parsed_requested_url['path'] ) ) {
 			$normalized_requested_url_no_query = untrailingslashit( stripslashes( $parsed_requested_url['path'] ) );
+
+			// untrailingslashit( '/' ) is ''. That is the homepage, and `from` uses `/` for it.
+			if ( '' === $normalized_requested_url_no_query ) {
+				$normalized_requested_url_no_query = '/';
+			}
 		}
 
 		if ( ! empty( $parsed_requested_url['query'] ) ) {
@@ -339,7 +726,7 @@ class Redirect_Txt_Redirects {
 
 		$queried_object = $wp_query->get_queried_object();
 
-		foreach ( $redirects as $redirect ) {
+		foreach ( $redirects as $index => $redirect ) {
 			$from_type    = self::get_url_type( $redirect['from'] );
 			$to_type      = self::get_url_type( $redirect['to'] );
 			$matched_path = false;
@@ -354,7 +741,7 @@ class Redirect_Txt_Redirects {
 
 				// URL.
 			} else {
-				$from = self::format_url( $redirect['from'] );
+				$from = self::strip_home_path( self::format_url( $redirect['from'] ) );
 			}
 
 			// Post ID.
@@ -390,7 +777,7 @@ class Redirect_Txt_Redirects {
 			// RegEx.
 			if ( 'regex' === $from_type ) {
 				$match_query_params = false;
-				$matched_path       = preg_match( '@' . $from . '@i', $url );
+				$matched_path       = preg_match( self::delimited_pattern( $from ), $url );
 			}
 
 			if ( ! $matched_path ) {
@@ -406,24 +793,29 @@ class Redirect_Txt_Redirects {
 
 				// Regex URL.
 				if ( 'regex' === $from_type ) {
-					$to   = preg_replace( '@' . $from . '@i', $to, $url );
+					$to   = preg_replace( self::delimited_pattern( $from ), $to, $url );
 					$to   = self::format_target_url( $to );
 					$from = $url;
 				}
 
 				/**
 				 * Whitelist redirect host.
+				 *
+				 * The probe below calls this function again. It must not replace the
+				 * host this redirect is about to send.
 				 */
-				if ( function_exists( 'wp_parse_url' ) ) {
-					$parsed_redirect = wp_parse_url( $to );
-				} else {
-					// phpcs:ignore
-					$parsed_redirect = parse_url( $to );
-				}
+				if ( ! self::$checking_repeat ) {
+					if ( function_exists( 'wp_parse_url' ) ) {
+						$parsed_redirect = wp_parse_url( $to );
+					} else {
+						// phpcs:ignore
+						$parsed_redirect = parse_url( $to );
+					}
 
-				if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
-					self::$whitelist_host = $parsed_redirect['host'];
-					add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
+					if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
+						self::$whitelist_host = $parsed_redirect['host'];
+						add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
+					}
 				}
 
 				// Re-add the query params if they've not already been added by the wildcard
@@ -435,8 +827,37 @@ class Redirect_Txt_Redirects {
 				/**
 				 * Filter the url to redirect to.
 				 */
-				$to = apply_filters( 'redirect_txt_redirect_to', $to );
+				if ( ! self::$checking_repeat ) {
+					$to = apply_filters( 'redirect_txt_redirect_to', $to );
+				}
 				$to = esc_url_raw( $to );
+
+				// The next request is lowercased and loses its slash and its fragment
+				// before this comparison runs again. A target that differs only by those
+				// is this same rule, and sending it loops. An earlier rule that would
+				// catch that request is a chain, not a loop, so this rule still fires.
+				// The probe still rejects an earlier rule that is itself a loop.
+				if ( self::sends_location( $redirect['status'] ) ) {
+					$repeats         = self::target_repeats(
+						$from_type,
+						'regex' === $from_type ? $redirect['from'] : $from,
+						$redirect['to'],
+						$to
+					);
+					$earlier_catches = false;
+
+					if ( $repeats && ! self::$checking_repeat ) {
+						$saved_host            = self::$whitelist_host;
+						self::$checking_repeat = true;
+						$earlier_catches       = self::earlier_rule_matches( array_slice( $redirects, 0, $index ), $to );
+						self::$checking_repeat = false;
+						self::$whitelist_host  = $saved_host;
+					}
+
+					if ( $repeats && ! $earlier_catches ) {
+						continue;
+					}
+				}
 
 				return [
 					'from'      => $from,

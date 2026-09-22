@@ -47,10 +47,10 @@ class RulesTest extends WP_UnitTestCase {
         $this->assertEquals( Redirect_Txt_Redirects::format_target_url(' /test/ '), '/test/' );
         $this->assertEquals( Redirect_Txt_Redirects::format_target_url('///multiple///slashes///'), '/multiple/slashes/' );
 
-		// The site root is a destination like any other. `format_url` returns '' here,
-		// which made `empty( $to )` drop a rule that asked to redirect to the root.
+		// The site root is a path. `format_url` used to return '' here, so a request
+		// for `/` never equalled it and a rule `/: /hello` matched nothing.
         $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/'), '/' );
-        $this->assertEquals( Redirect_Txt_Redirects::format_url('/'), '' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_url('/'), '/' );
 
 		// An empty target stays empty, which is what the 403/404/410 rules rely on.
         $this->assertEquals( Redirect_Txt_Redirects::format_target_url(''), '' );
@@ -331,7 +331,6 @@ class RulesTest extends WP_UnitTestCase {
 			)
 		);
 
-		// Multiple rules with comments and different statuses.
 		// Keep only rules with post ID in `from` field.
         $this->assertEquals(
 			Redirect_Txt_Redirects::parse_redirect_rules($rules_large, false, true),
@@ -344,4 +343,237 @@ class RulesTest extends WP_UnitTestCase {
 			)
 		);
     }
+
+	/**
+	 * A target the next request would match again is not a redirect.
+	 *
+	 * Matching lowercases the path and drops the trailing slash, and the browser
+	 * does not send the fragment. Slash, case, an added query, and a same-path
+	 * fragment all come back as the same request. A later rule for that path
+	 * still applies. A target on another path does not.
+	 */
+	public function test_self_redirect_is_not_a_match() {
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/loop', "/loop: /loop/" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/loop/', "/loop: /loop/" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/case', "/case: /Case/" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/same', "/same: /same" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/q', "/q: /q?x=1" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/hash', "/hash: /hash#section" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/foo', "^/(.*): /\$1" )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules(
+				'/loop2',
+				'/loop2: ' . home_url( '/loop2/' )
+			)
+		);
+
+		$next = Redirect_Txt_Redirects::match_url_to_rules(
+			'/loop',
+			"/loop: /loop/\n/loop: /elsewhere/"
+		);
+		$this->assertEquals( '/elsewhere/', $next['to'] );
+		$this->assertEquals( '/elsewhere/', $next['to_rule'] );
+	}
+
+	/**
+	 * Rules that already redirected stay on the Location they asked for.
+	 */
+	public function test_real_redirects_keep_their_target() {
+		$cases = array(
+			array( '/old/', "/old/: /pricing/", '/pricing/' ),
+			array( '/Upper/', "/Upper/: /MixedCase/", '/MixedCase/' ),
+			array( '/root/', "/root/: /", '/' ),
+			array( '/oldhash', "/oldhash: /newhash#section", '/newhash#section' ),
+			array( '/withq?x=1', "/withq?x=1: /withq?x=2", '/withq?x=2' ),
+			array( '/external', "/external: https://example.com/path/", 'https://example.com/path/' ),
+			array( '/loop2', "/loop2: https://example.com/loop2/", 'https://example.com/loop2/' ),
+			array( '/old?utm=1', "/old: /new/", '/new/?utm=1' ),
+			array( '/a', "^/(.*): /x\$1", '/xa' ),
+			array( '/', "/: /hello/", '/hello/' ),
+		);
+
+		foreach ( $cases as $case ) {
+			$match = Redirect_Txt_Redirects::match_url_to_rules( $case[0], $case[1] );
+			$this->assertIsArray( $match, $case[1] );
+			$this->assertEquals( $case[2], $match['to'], $case[1] );
+		}
+
+		$blocked = Redirect_Txt_Redirects::match_url_to_rules(
+			'/blocked',
+			"404:\n/blocked: /blocked"
+		);
+		$this->assertEquals( 404, $blocked['status'] );
+	}
+
+	/**
+	 * Plain rules on a site installed in a subdirectory.
+	 *
+	 * The request arrives with the home path on the front, and the Location has
+	 * to keep it, because a path that starts with `/` is host-absolute. A home
+	 * path that only appears later in the URL is not the prefix and is left alone.
+	 */
+	public function test_plain_rules_match_in_a_subdirectory() {
+		add_filter( 'home_url', array( $this, 'append_subdir_to_home_url' ) );
+
+		$match = Redirect_Txt_Redirects::match_url_to_rules( '/subdir/old/', "/old/: /new/" );
+		$miss  = Redirect_Txt_Redirects::match_url_to_rules( '/2024/subdir/post', "/2024/post: /dest/" );
+
+		remove_all_filters( 'home_url' );
+
+		$this->assertIsArray( $match );
+		$this->assertEquals( '/subdir/new/', $match['to'] );
+		$this->assertFalse( $miss );
+	}
+
+	/**
+	 * Filter callback. Puts the site in /subdir for one test.
+	 *
+	 * @param string $url Home URL.
+	 * @return string
+	 */
+	public function append_subdir_to_home_url( $url ) {
+		if ( false !== strpos( $url, '/subdir' ) ) {
+			return $url;
+		}
+
+		return rtrim( $url, '/' ) . '/subdir';
+	}
+
+	/**
+	 * `@` is a valid character in a pattern. It is not the delimiter.
+	 */
+	public function test_regex_pattern_may_contain_at_sign() {
+		$match = Redirect_Txt_Redirects::match_url_to_rules(
+			'/user/ada@example.com',
+			'^/user/(.*)@example.com: /u/$1'
+		);
+
+		$this->assertEquals( '/u/ada', $match['to'] );
+	}
+
+	/**
+	 * A post redirected to itself does not loop. A post redirected to another does.
+	 */
+	public function test_post_id_self_redirect_is_skipped() {
+		$from_id = $this->factory->post->create(
+			array(
+				'post_title' => 'From',
+				'post_name'  => 'from-post',
+			)
+		);
+		$to_id   = $this->factory->post->create(
+			array(
+				'post_title' => 'To',
+				'post_name'  => 'to-post',
+			)
+		);
+
+		global $wp_query;
+		$wp_query->queried_object    = get_post( $from_id );
+		$wp_query->queried_object_id = $from_id;
+
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/from-post', $from_id . ': ' . $from_id, true, true )
+		);
+
+		$match = Redirect_Txt_Redirects::match_url_to_rules( '/from-post', $from_id . ': ' . $to_id, true, true );
+		$this->assertEquals( get_permalink( $to_id ), $match['to'] );
+	}
+
+	/**
+	 * A target outside this install is not a loop, even on the same hostname.
+	 * A query chain that an earlier rule finishes is not a loop either.
+	 * A query that differs only by case is.
+	 */
+	public function test_leaving_the_install_is_not_a_loop() {
+		add_filter( 'home_url', array( $this, 'append_subdir_to_home_url' ) );
+
+		$home  = wp_parse_url( home_url() );
+		$root  = $home['scheme'] . '://' . $home['host'] . ( empty( $home['port'] ) ? '' : ':' . $home['port'] );
+		$leave = Redirect_Txt_Redirects::match_url_to_rules( '/subdir/old/', '/old/: ' . $root . '/old/' );
+		$moved = Redirect_Txt_Redirects::match_url_to_rules( '/subdir/my-post', '^/(.*): ' . $root . '/$1' );
+
+		remove_all_filters( 'home_url' );
+
+		$this->assertEquals( $root . '/old/', $leave['to'] );
+		$this->assertEquals( $root . '/my-post', $moved['to'] );
+
+		$home = wp_parse_url( home_url() );
+		$other_port = $home['scheme'] . '://' . $home['host'] . ':9999/page';
+		$ported = Redirect_Txt_Redirects::match_url_to_rules( '/page', '/page: ' . $other_port );
+		$this->assertEquals( $other_port, $ported['to'] );
+
+		$chain = "/shop?currency=usd: /store\n/shop: /shop?currency=usd";
+		$first = Redirect_Txt_Redirects::match_url_to_rules( '/shop', $chain );
+		$second = Redirect_Txt_Redirects::match_url_to_rules( '/shop?currency=usd', $chain );
+		$this->assertEquals( '/shop?currency=usd', $first['to'] );
+		$this->assertEquals( '/store', $second['to'] );
+
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/q?x=1', '/q?x=1: /q?X=1' )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/page?Foo=1', '/page?Foo=1: /page?Foo=1' )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/', '^/$: /' )
+		);
+
+		$home_rule = Redirect_Txt_Redirects::match_url_to_rules( '/', '^/$: /hello' );
+		$this->assertEquals( '/hello', $home_rule['to'] );
+
+		$delimited = Redirect_Txt_Redirects::match_url_to_rules( '/a#', '^/a[#~!%`]: /ok' );
+		$this->assertEquals( '/ok', $delimited['to'] );
+	}
+
+	/**
+	 * An earlier rule counts as a chain only when that rule itself would redirect.
+	 * http and https on the same host are still this install. A slash the live
+	 * request will lose is already gone when the earlier rule is tested.
+	 */
+	public function test_a_looping_earlier_rule_is_not_a_chain() {
+		$loop = "/shop?currency=usd: /shop?currency=usd\n/shop: /shop?currency=usd";
+		$this->assertFalse( Redirect_Txt_Redirects::match_url_to_rules( '/shop', $loop ) );
+		$this->assertFalse( Redirect_Txt_Redirects::match_url_to_rules( '/shop?currency=usd', $loop ) );
+
+		$anchored = "^/sale$: /promo\n/sale: /sale/";
+		$sale = Redirect_Txt_Redirects::match_url_to_rules( '/sale/', $anchored );
+		$this->assertEquals( '/sale/', $sale['to'] );
+		$promo = Redirect_Txt_Redirects::match_url_to_rules( '/sale', $anchored );
+		$this->assertEquals( '/promo', $promo['to'] );
+
+		add_filter(
+			'home_url',
+			static function () {
+				return 'https://example.com';
+			}
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/page', '/page: http://example.com/page' )
+		);
+
+		Redirect_Txt_Redirects::$whitelist_host = '';
+		$redirect = Redirect_Txt_Redirects::match_url_to_rules(
+			'/shop',
+			"/shop?currency=usd: https://store.other.com/\n/shop: https://www.example.com/shop?currency=usd"
+		);
+		remove_all_filters( 'home_url' );
+
+		$this->assertEquals( 'https://www.example.com/shop?currency=usd', $redirect['to'] );
+		$this->assertEquals( 'www.example.com', Redirect_Txt_Redirects::$whitelist_host );
+	}
 }
