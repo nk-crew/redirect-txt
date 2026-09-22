@@ -433,7 +433,13 @@ class Redirect_Txt_Redirects {
 			return false;
 		}
 
-		$next      = untrailingslashit( self::strip_home_path( $next ) );
+		$next = untrailingslashit( self::strip_home_path( $next ) );
+
+		// The matcher turns that empty string back into `/` before the pattern runs.
+		if ( '' === $next ) {
+			$next = '/';
+		}
+
 		$delimited = self::delimited_pattern( $pattern );
 
 		if ( ! preg_match( $delimited, $next ) ) {

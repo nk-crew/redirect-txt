@@ -526,6 +526,15 @@ class RulesTest extends WP_UnitTestCase {
 		$this->assertFalse(
 			Redirect_Txt_Redirects::match_url_to_rules( '/q?x=1', '/q?x=1: /q?X=1' )
 		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/page?Foo=1', '/page?Foo=1: /page?Foo=1' )
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/', '^/$: /' )
+		);
+
+		$home_rule = Redirect_Txt_Redirects::match_url_to_rules( '/', '^/$: /hello' );
+		$this->assertEquals( '/hello', $home_rule['to'] );
 
 		$delimited = Redirect_Txt_Redirects::match_url_to_rules( '/a#', '^/a[#~!%`]: /ok' );
 		$this->assertEquals( '/ok', $delimited['to'] );
