@@ -493,4 +493,41 @@ class RulesTest extends WP_UnitTestCase {
 		$match = Redirect_Txt_Redirects::match_url_to_rules( '/from-post', $from_id . ': ' . $to_id, true, true );
 		$this->assertEquals( get_permalink( $to_id ), $match['to'] );
 	}
+
+	/**
+	 * A target outside this install is not a loop, even on the same hostname.
+	 * A query chain that an earlier rule finishes is not a loop either.
+	 * A query that differs only by case is.
+	 */
+	public function test_leaving_the_install_is_not_a_loop() {
+		add_filter( 'home_url', array( $this, 'append_subdir_to_home_url' ) );
+
+		$home  = wp_parse_url( home_url() );
+		$root  = $home['scheme'] . '://' . $home['host'] . ( empty( $home['port'] ) ? '' : ':' . $home['port'] );
+		$leave = Redirect_Txt_Redirects::match_url_to_rules( '/subdir/old/', '/old/: ' . $root . '/old/' );
+		$moved = Redirect_Txt_Redirects::match_url_to_rules( '/subdir/my-post', '^/(.*): ' . $root . '/$1' );
+
+		remove_all_filters( 'home_url' );
+
+		$this->assertEquals( $root . '/old/', $leave['to'] );
+		$this->assertEquals( $root . '/my-post', $moved['to'] );
+
+		$home = wp_parse_url( home_url() );
+		$other_port = $home['scheme'] . '://' . $home['host'] . ':9999/page';
+		$ported = Redirect_Txt_Redirects::match_url_to_rules( '/page', '/page: ' . $other_port );
+		$this->assertEquals( $other_port, $ported['to'] );
+
+		$chain = "/shop?currency=usd: /store\n/shop: /shop?currency=usd";
+		$first = Redirect_Txt_Redirects::match_url_to_rules( '/shop', $chain );
+		$second = Redirect_Txt_Redirects::match_url_to_rules( '/shop?currency=usd', $chain );
+		$this->assertEquals( '/shop?currency=usd', $first['to'] );
+		$this->assertEquals( '/store', $second['to'] );
+
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/q?x=1', '/q?x=1: /q?X=1' )
+		);
+
+		$delimited = Redirect_Txt_Redirects::match_url_to_rules( '/a#', '^/a[#~!%`]: /ok' );
+		$this->assertEquals( '/ok', $delimited['to'] );
+	}
 }

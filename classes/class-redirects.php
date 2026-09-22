@@ -21,6 +21,16 @@ class Redirect_Txt_Redirects {
 	public static $whitelist_host;
 
 	/**
+	 * True while checking whether an earlier rule would catch the next request.
+	 *
+	 * The check calls match_url_to_rules again. Without this it would decide
+	 * the inner call is a loop and never see the earlier rule.
+	 *
+	 * @var bool
+	 */
+	private static $checking_repeat = false;
+
+	/**
 	 * Redirect_Txt_Redirects constructor.
 	 */
 	public static function init() {
@@ -213,7 +223,7 @@ class Redirect_Txt_Redirects {
 	 * @return string
 	 */
 	private static function delimited_pattern( $pattern ) {
-		$delimiters = array( '#', '~', '!', '%', '`' );
+		$delimiters = array( '#', '~', '!', '%', '`', "\x01" );
 
 		foreach ( $delimiters as $delimiter ) {
 			if ( false === strpos( $pattern, $delimiter ) ) {
@@ -221,7 +231,7 @@ class Redirect_Txt_Redirects {
 			}
 		}
 
-		return '#' . $pattern . '#i';
+		return "\x01" . $pattern . "\x01i";
 	}
 
 	/**
@@ -251,10 +261,51 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * Port the URL is served on, including the scheme default.
+	 *
+	 * @param array $parts Parsed URL.
+	 * @return int
+	 */
+	private static function url_port( $parts ) {
+		if ( isset( $parts['port'] ) ) {
+			return (int) $parts['port'];
+		}
+
+		if ( isset( $parts['scheme'] ) && 'https' === strtolower( $parts['scheme'] ) ) {
+			return 443;
+		}
+
+		return 80;
+	}
+
+	/**
+	 * Whether a path is the install, or sits under its subdirectory.
+	 *
+	 * @param string $path Path, without a query.
+	 * @return bool
+	 */
+	private static function path_is_inside_home( $path ) {
+		$prefix = self::home_path_prefix();
+
+		if ( '' === $prefix ) {
+			return true;
+		}
+
+		if ( 0 !== stripos( $path, $prefix ) ) {
+			return false;
+		}
+
+		$rest = substr( $path, strlen( $prefix ) );
+
+		return '' === $rest || '/' === $rest[0];
+	}
+
+	/**
 	 * Path and query of a Location that points at this site.
 	 *
-	 * Null when the Location is on another host. The fragment is dropped because
-	 * the browser does not send it on the next request.
+	 * Null when the next request would not hit this install: another host, another
+	 * port, or a path outside the subdirectory. The fragment is dropped because
+	 * the browser does not send it.
 	 *
 	 * @param string $url Location or path.
 	 * @return string|null
@@ -281,7 +332,15 @@ class Redirect_Txt_Redirects {
 			return null;
 		}
 
+		if ( self::url_port( $parts ) !== self::url_port( $home ) ) {
+			return null;
+		}
+
 		$path = isset( $parts['path'] ) ? $parts['path'] : '/';
+
+		if ( ! self::path_is_inside_home( $path ) ) {
+			return null;
+		}
 
 		if ( ! empty( $parts['query'] ) ) {
 			$path .= '?' . $parts['query'];
@@ -301,7 +360,7 @@ class Redirect_Txt_Redirects {
 		$query_pos = strpos( $url, '?' );
 
 		if ( false !== $query_pos ) {
-			$query = substr( $url, $query_pos );
+			$query = strtolower( substr( $url, $query_pos ) );
 			$url   = substr( $url, 0, $query_pos );
 		}
 
@@ -419,6 +478,41 @@ class Redirect_Txt_Redirects {
 		}
 
 		return self::keys_repeat( $from, $to_key );
+	}
+
+	/**
+	 * An earlier rule matches the Location this rule would send.
+	 *
+	 * That request never comes back to this rule, so the redirect is a chain.
+	 *
+	 * @param array  $earlier  Rules parsed before this one.
+	 * @param string $location Location this rule would send.
+	 * @return bool
+	 */
+	private static function earlier_rule_matches( $earlier, $location ) {
+		if ( empty( $earlier ) ) {
+			return false;
+		}
+
+		$next = self::location_on_this_site( $location );
+
+		if ( null === $next ) {
+			return false;
+		}
+
+		$lines  = array();
+		$status = null;
+
+		foreach ( $earlier as $rule ) {
+			if ( $status !== (int) $rule['status'] ) {
+				$status  = (int) $rule['status'];
+				$lines[] = $status . ':';
+			}
+
+			$lines[] = $rule['from'] . ': ' . $rule['to'];
+		}
+
+		return false !== self::match_url_to_rules( $next, implode( "\n", $lines ) );
 	}
 
 	/**
@@ -614,7 +708,7 @@ class Redirect_Txt_Redirects {
 
 		$queried_object = $wp_query->get_queried_object();
 
-		foreach ( $redirects as $redirect ) {
+		foreach ( $redirects as $index => $redirect ) {
 			$from_type    = self::get_url_type( $redirect['from'] );
 			$to_type      = self::get_url_type( $redirect['to'] );
 			$matched_path = false;
@@ -715,17 +809,22 @@ class Redirect_Txt_Redirects {
 
 				// The next request is lowercased and loses its slash and its fragment
 				// before this comparison runs again. A target that differs only by those
-				// is this same rule, and sending it loops. A later rule can still match.
-				if (
-					self::sends_location( $redirect['status'] ) &&
-					self::target_repeats(
+				// is this same rule, and sending it loops. An earlier rule that would
+				// catch that request is a chain, not a loop, so this rule still fires.
+				if ( ! self::$checking_repeat && self::sends_location( $redirect['status'] ) ) {
+					self::$checking_repeat = true;
+					$repeats               = self::target_repeats(
 						$from_type,
 						'regex' === $from_type ? $redirect['from'] : $from,
 						$redirect['to'],
 						$to
-					)
-				) {
-					continue;
+					);
+					$earlier_catches       = $repeats && self::earlier_rule_matches( array_slice( $redirects, 0, $index ), $to );
+					self::$checking_repeat = false;
+
+					if ( $repeats && ! $earlier_catches ) {
+						continue;
+					}
 				}
 
 				return [
