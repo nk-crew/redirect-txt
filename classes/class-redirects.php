@@ -332,7 +332,12 @@ class Redirect_Txt_Redirects {
 			return null;
 		}
 
-		if ( self::url_port( $parts ) !== self::url_port( $home ) ) {
+		// 80 and 443 with no port written in the URL are the same install seen
+		// over http and https. An explicit port, such as :8443, is another listener.
+		$target_has_port = isset( $parts['port'] );
+		$home_has_port   = isset( $home['port'] );
+
+		if ( ( $target_has_port || $home_has_port ) && self::url_port( $parts ) !== self::url_port( $home ) ) {
 			return null;
 		}
 
@@ -504,6 +509,13 @@ class Redirect_Txt_Redirects {
 
 		if ( null === $next ) {
 			return false;
+		}
+
+		// maybe_process_redirect strips the slash before this matcher runs.
+		$next = untrailingslashit( $next );
+
+		if ( '' === $next ) {
+			$next = '/';
 		}
 
 		$lines  = array();
@@ -788,17 +800,22 @@ class Redirect_Txt_Redirects {
 
 				/**
 				 * Whitelist redirect host.
+				 *
+				 * The probe below calls this function again. It must not replace the
+				 * host this redirect is about to send.
 				 */
-				if ( function_exists( 'wp_parse_url' ) ) {
-					$parsed_redirect = wp_parse_url( $to );
-				} else {
-					// phpcs:ignore
-					$parsed_redirect = parse_url( $to );
-				}
+				if ( ! self::$checking_repeat ) {
+					if ( function_exists( 'wp_parse_url' ) ) {
+						$parsed_redirect = wp_parse_url( $to );
+					} else {
+						// phpcs:ignore
+						$parsed_redirect = parse_url( $to );
+					}
 
-				if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
-					self::$whitelist_host = $parsed_redirect['host'];
-					add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
+					if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
+						self::$whitelist_host = $parsed_redirect['host'];
+						add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
+					}
 				}
 
 				// Re-add the query params if they've not already been added by the wildcard
@@ -810,23 +827,32 @@ class Redirect_Txt_Redirects {
 				/**
 				 * Filter the url to redirect to.
 				 */
-				$to = apply_filters( 'redirect_txt_redirect_to', $to );
+				if ( ! self::$checking_repeat ) {
+					$to = apply_filters( 'redirect_txt_redirect_to', $to );
+				}
 				$to = esc_url_raw( $to );
 
 				// The next request is lowercased and loses its slash and its fragment
 				// before this comparison runs again. A target that differs only by those
 				// is this same rule, and sending it loops. An earlier rule that would
 				// catch that request is a chain, not a loop, so this rule still fires.
-				if ( ! self::$checking_repeat && self::sends_location( $redirect['status'] ) ) {
-					self::$checking_repeat = true;
-					$repeats               = self::target_repeats(
+				// The probe still rejects an earlier rule that is itself a loop.
+				if ( self::sends_location( $redirect['status'] ) ) {
+					$repeats         = self::target_repeats(
 						$from_type,
 						'regex' === $from_type ? $redirect['from'] : $from,
 						$redirect['to'],
 						$to
 					);
-					$earlier_catches       = $repeats && self::earlier_rule_matches( array_slice( $redirects, 0, $index ), $to );
-					self::$checking_repeat = false;
+					$earlier_catches = false;
+
+					if ( $repeats && ! self::$checking_repeat ) {
+						$saved_host            = self::$whitelist_host;
+						self::$checking_repeat = true;
+						$earlier_catches       = self::earlier_rule_matches( array_slice( $redirects, 0, $index ), $to );
+						self::$checking_repeat = false;
+						self::$whitelist_host  = $saved_host;
+					}
 
 					if ( $repeats && ! $earlier_catches ) {
 						continue;

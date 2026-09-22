@@ -539,4 +539,41 @@ class RulesTest extends WP_UnitTestCase {
 		$delimited = Redirect_Txt_Redirects::match_url_to_rules( '/a#', '^/a[#~!%`]: /ok' );
 		$this->assertEquals( '/ok', $delimited['to'] );
 	}
+
+	/**
+	 * An earlier rule counts as a chain only when that rule itself would redirect.
+	 * http and https on the same host are still this install. A slash the live
+	 * request will lose is already gone when the earlier rule is tested.
+	 */
+	public function test_a_looping_earlier_rule_is_not_a_chain() {
+		$loop = "/shop?currency=usd: /shop?currency=usd\n/shop: /shop?currency=usd";
+		$this->assertFalse( Redirect_Txt_Redirects::match_url_to_rules( '/shop', $loop ) );
+		$this->assertFalse( Redirect_Txt_Redirects::match_url_to_rules( '/shop?currency=usd', $loop ) );
+
+		$anchored = "^/sale$: /promo\n/sale: /sale/";
+		$sale = Redirect_Txt_Redirects::match_url_to_rules( '/sale/', $anchored );
+		$this->assertEquals( '/sale/', $sale['to'] );
+		$promo = Redirect_Txt_Redirects::match_url_to_rules( '/sale', $anchored );
+		$this->assertEquals( '/promo', $promo['to'] );
+
+		add_filter(
+			'home_url',
+			static function () {
+				return 'https://example.com';
+			}
+		);
+		$this->assertFalse(
+			Redirect_Txt_Redirects::match_url_to_rules( '/page', '/page: http://example.com/page' )
+		);
+
+		Redirect_Txt_Redirects::$whitelist_host = '';
+		$redirect = Redirect_Txt_Redirects::match_url_to_rules(
+			'/shop',
+			"/shop?currency=usd: https://store.other.com/\n/shop: https://www.example.com/shop?currency=usd"
+		);
+		remove_all_filters( 'home_url' );
+
+		$this->assertEquals( 'https://www.example.com/shop?currency=usd', $redirect['to'] );
+		$this->assertEquals( 'www.example.com', Redirect_Txt_Redirects::$whitelist_host );
+	}
 }
