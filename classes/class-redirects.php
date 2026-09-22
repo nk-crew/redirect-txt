@@ -59,40 +59,89 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
-	 * Prepare `from` and `to` URLs.
+	 * Prepare a URL, without deciding what it is for.
+	 *
+	 * Resolves a relative URL against the site, collapses repeated slashes and trims
+	 * whitespace. Leaves the case and the trailing slash alone; the two callers below
+	 * want different things from those.
+	 *
+	 * @param string $url - url string.
+	 *
+	 * @return string
+	 */
+	private static function normalize_url( $url ) {
+		$url = urldecode( html_entity_decode( trim( $url ) ) );
+
+		if ( '' === $url ) {
+			return '';
+		}
+
+		if ( preg_match( '/^www\./i', $url ) ) {
+			$url = 'http://' . $url;
+		}
+
+		if ( self::is_absolute_url( $url ) ) {
+			// Remove multiple slashes.
+			return trim( preg_replace( '/([^:])(\/{2,})/', '$1/', $url ) );
+		}
+
+		$complete_url = rtrim( home_url(), '/' ) . '/' . $url;
+
+		// phpcs:ignore
+		list( $uprotocol, $uempty, $uhost, $path ) = explode( '/', $complete_url, 4 );
+
+		$path = '/' . $path;
+
+		// Remove multiple slashes.
+		return trim( preg_replace( '#/+#', '/', $path ) );
+	}
+
+	/**
+	 * Check whether a URL carries its own scheme.
+	 *
+	 * @param string $url - url string.
+	 *
+	 * @return bool
+	 */
+	private static function is_absolute_url( $url ) {
+		return (bool) preg_match( '/^https?:\/\//i', $url );
+	}
+
+	/**
+	 * Prepare a `from` URL for matching.
+	 *
+	 * Lowercases the path and drops the trailing slash, because the requested URL is
+	 * put through the same treatment before the comparison. Both sides have to agree.
 	 *
 	 * @param string $url - url string.
 	 *
 	 * @return string
 	 */
 	public static function format_url( $url ) {
-		$url = urldecode( html_entity_decode( trim( $url ) ) );
+		$url = self::normalize_url( $url );
 
-		if ( preg_match( '/^www\./i', $url ) ) {
-			$url = 'http://' . $url;
+		// An absolute URL is matched as written.
+		if ( self::is_absolute_url( $url ) ) {
+			return $url;
 		}
 
-		if ( preg_match( '/^https?:\/\//i', $url ) ) {
-			$from = $url;
+		return strtolower( rtrim( $url, '/' ) );
+	}
 
-			// Remove multiple slashes.
-			$from = preg_replace( '/([^:])(\/{2,})/', '$1/', $from );
-		} else {
-			$complete_url = rtrim( home_url(), '/' ) . '/' . $url;
-
-			// phpcs:ignore
-			list( $uprotocol, $uempty, $uhost, $from ) = explode( '/', $complete_url, 4 );
-
-			$from = '/' . $from;
-
-			// Remove multiple slashes.
-			$from = preg_replace( '#/+#', '/', $from );
-
-			// Remove slash from the end of line.
-			$from = strtolower( rtrim( $from, '/' ) );
-		}
-
-		return trim( $from );
+	/**
+	 * Prepare a `to` URL for the Location header.
+	 *
+	 * A target is never compared with anything, so it keeps the case and the trailing
+	 * slash the rule asked for. Dropping the slash makes WordPress answer the
+	 * slash-less URL with a second redirect that puts it back, and every such redirect
+	 * then costs two hops instead of one.
+	 *
+	 * @param string $url - url string.
+	 *
+	 * @return string
+	 */
+	public static function format_target_url( $url ) {
+		return self::normalize_url( $url );
 	}
 
 	/**
@@ -318,7 +367,7 @@ class Redirect_Txt_Redirects {
 
 				// URL.
 			} else {
-				$to = self::format_url( $redirect['to'] );
+				$to = self::format_target_url( $redirect['to'] );
 			}
 
 			// Check if the redirection destination is valid, otherwise just skip it (unless this is a 4xx request).
@@ -358,7 +407,7 @@ class Redirect_Txt_Redirects {
 				// Regex URL.
 				if ( 'regex' === $from_type ) {
 					$to   = preg_replace( '@' . $from . '@i', $to, $url );
-					$to   = self::format_url( $to );
+					$to   = self::format_target_url( $to );
 					$from = $url;
 				}
 
@@ -472,6 +521,16 @@ class Redirect_Txt_Redirects {
 		}
 
 		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
+
+		/**
+		 * The trailing slash goes before matching, and it has to. A rule anchored with
+		 * `$`, such as `^/old$`, is written against this stripped form, so a request for
+		 * `/old/` only reaches it once the slash is gone. The cost is that a regex rule
+		 * rebuilds its target from a URL that has already lost the slash, so a request
+		 * for `/old/thing/` still redirects to `/new/thing` and WordPress adds the slash
+		 * back with a second hop. Plain rules do not pay that, because their target comes
+		 * from the rule rather than from the request.
+		 */
 		$requested_url = untrailingslashit( stripslashes( $requested_url ) );
 
 		// Skip protected paths.

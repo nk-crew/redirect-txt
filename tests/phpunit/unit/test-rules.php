@@ -21,6 +21,42 @@ class RulesTest extends WP_UnitTestCase {
     }
 
     /**
+     * Test target URLs format.
+	 *
+	 * A `to` URL is never compared with anything, it only becomes the Location header.
+	 * So it keeps the trailing slash and the case the rule asked for: dropping either
+	 * makes WordPress answer with a second redirect that puts it back.
+     */
+    public function test_format_target_urls() {
+		// Keep the trailing slash the rule asked for.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test/'), '/test/' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('test/'), '/test/' );
+
+		// And do not invent one that was not there.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test'), '/test' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('test'), '/test' );
+
+		// Keep the case.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/MixedCase/'), '/MixedCase/' );
+
+		// Fragments and external URLs are untouched, as before.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test/#section'), '/test/#section' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('https://example.com/path/'), 'https://example.com/path/' );
+
+		// The shared cleanup still applies.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url(' /test/ '), '/test/' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('///multiple///slashes///'), '/multiple/slashes/' );
+
+		// The site root is a destination like any other. `format_url` returns '' here,
+		// which made `empty( $to )` drop a rule that asked to redirect to the root.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/'), '/' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_url('/'), '' );
+
+		// An empty target stays empty, which is what the 403/404/410 rules rely on.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url(''), '' );
+    }
+
+    /**
      * Test external URLs format.
      */
     public function test_format_external_urls() {
@@ -105,6 +141,14 @@ class RulesTest extends WP_UnitTestCase {
 
     /**
      * Test RegEx match URLs.
+	 *
+	 * The capture carries whatever it is given, trailing slash included, so `/test/url/`
+	 * against `^/test/(.*)` targets `/new-test/url/` and not `/new-test/url`.
+	 *
+	 * A live request does not arrive that way. `maybe_process_redirect` strips the
+	 * trailing slash before matching, because a rule anchored with `$` is written
+	 * against the stripped form. So in production a regex rule still rebuilds its
+	 * target from a slash-less URL and costs the second hop. Plain rules do not.
      */
     public function test_match_regex() {
         $this->assertEquals(
@@ -118,7 +162,7 @@ class RulesTest extends WP_UnitTestCase {
 				'from'      => '/test/url/',
 				'from_type' => 'regex',
 				'from_rule' => '^/test/(.*)',
-				'to'        => '/new-test/url',
+				'to'        => '/new-test/url/',
 				'to_type'   => 'url',
 				'to_rule'   => '/new-test/$1',
 				'status'    => 301,
@@ -136,7 +180,7 @@ class RulesTest extends WP_UnitTestCase {
 				'from'      => '/testurl/',
 				'from_type' => 'regex',
 				'from_rule' => '^/test(.*)url',
-				'to'        => '/new-test',
+				'to'        => '/new-test/',
 				'to_type'   => 'url',
 				'to_rule'   => '/new-test/',
 				'status'    => 301,
@@ -172,7 +216,7 @@ class RulesTest extends WP_UnitTestCase {
 				'from'      => '/2024/04/06/test/',
 				'from_type' => 'regex',
 				'from_rule' => '^/\d{4}/\d{2}/\d{2}/(.*)',
-				'to'        => '/test',
+				'to'        => '/test/',
 				'to_type'   => 'url',
 				'to_rule'   => '/$1',
 				'status'    => 301,
