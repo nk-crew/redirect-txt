@@ -21,6 +21,34 @@ class RulesTest extends WP_UnitTestCase {
     }
 
     /**
+     * Test target URLs format.
+	 *
+	 * A `to` URL is never compared with anything, it only becomes the Location header.
+	 * So it keeps the trailing slash and the case the rule asked for: dropping either
+	 * makes WordPress answer with a second redirect that puts it back.
+     */
+    public function test_format_target_urls() {
+		// Keep the trailing slash the rule asked for.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test/'), '/test/' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('test/'), '/test/' );
+
+		// And do not invent one that was not there.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test'), '/test' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('test'), '/test' );
+
+		// Keep the case.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/MixedCase/'), '/MixedCase/' );
+
+		// Fragments and external URLs are untouched, as before.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('/test/#section'), '/test/#section' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('https://example.com/path/'), 'https://example.com/path/' );
+
+		// The shared cleanup still applies.
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url(' /test/ '), '/test/' );
+        $this->assertEquals( Redirect_Txt_Redirects::format_target_url('///multiple///slashes///'), '/multiple/slashes/' );
+    }
+
+    /**
      * Test external URLs format.
      */
     public function test_format_external_urls() {
