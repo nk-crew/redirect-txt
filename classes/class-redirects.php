@@ -75,12 +75,14 @@ class Redirect_Txt_Redirects {
 	 * whitespace. Leaves the case and the trailing slash alone; the two callers below
 	 * want different things from those.
 	 *
-	 * @param string $url - url string.
+	 * @param string $url    - url string.
+	 * @param bool   $is_path - decode `+` as a literal plus, as in a request path.
 	 *
 	 * @return string
 	 */
-	private static function normalize_url( $url ) {
-		$url = urldecode( html_entity_decode( trim( $url ) ) );
+	private static function normalize_url( $url, $is_path = false ) {
+		$url = html_entity_decode( trim( $url ) );
+		$url = $is_path ? rawurldecode( $url ) : urldecode( $url );
 
 		if ( '' === $url ) {
 			return '';
@@ -128,7 +130,7 @@ class Redirect_Txt_Redirects {
 	 * @return string
 	 */
 	public static function format_url( $url ) {
-		$url = self::normalize_url( $url );
+		$url = self::normalize_url( $url, true );
 
 		// An absolute URL is matched as written.
 		if ( self::is_absolute_url( $url ) ) {
@@ -877,9 +879,9 @@ class Redirect_Txt_Redirects {
 			}
 
 			if ( ! $matched_path ) {
-				// format_url runs `from` through urldecode, so decode the request the same way (`+` is a space on both sides).
+				// format_url runs `from` through rawurldecode, so decode the request the same way (`+` stays a plus).
 				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_url_no_query ) ) ? $normalized_requested_url_no_query : $normalized_requested_url;
-				$matched_path = urldecode( $to_match ) === $from;
+				$matched_path = rawurldecode( $to_match ) === $from;
 			}
 
 			if ( $matched_path ) {

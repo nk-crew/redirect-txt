@@ -341,5 +341,6 @@ class SecurityTest extends WP_UnitTestCase {
 	public function test_plus_in_plain_rule_matches() {
 		$this->assertStringEndsWith( '/x', (string) $this->location_for( '/a+b', '/a+b: /x' ) );
 		$this->assertStringEndsWith( '/cpp', (string) $this->location_for( '/c++-guide', '/c++-guide: /cpp' ) );
+		$this->assertNull( $this->location_for( '/a+b', '/a%20b: /space' ) );
 	}
 }
