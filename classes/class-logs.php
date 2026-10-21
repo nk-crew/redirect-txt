@@ -174,8 +174,9 @@ class Redirect_Txt_Logs {
 
 		self::store_log(
 			array(
-				// phpcs:ignore
-				'url_from' => isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( $_SERVER['REQUEST_URI'] ) : '',
+				// The form the matcher reads, so a rule copied from the log matches this request.
+				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw.
+				'url_from' => isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
 				'status'   => 404,
 			)
 		);

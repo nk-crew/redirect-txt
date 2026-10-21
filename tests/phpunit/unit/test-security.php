@@ -252,4 +252,94 @@ class SecurityTest extends WP_UnitTestCase {
 		$this->assertSame( '/redirect', $stored[1]['url_from'] );
 		$this->assertSame( '/old-998', $stored[1000]['url_from'] );
 	}
+
+	/**
+	 * Rules saved before rules were kept as written lost their %-octets. They still fire.
+	 */
+	public function test_rules_stored_by_old_sanitizer_still_match() {
+		$typed_rules = array(
+			'/caf%C3%A9: /cafe',
+			'/%D0%BE-%D0%BD%D0%B0%D1%81: /about',
+			'/my%20page: /new',
+			'/p?a=1%262: /x',
+		);
+
+		foreach ( $typed_rules as $typed ) {
+			list( $request, $target ) = explode( ': ', $typed );
+
+			$this->assertStringEndsWith( $target, (string) $this->location_for( $request, sanitize_textarea_field( $typed ) ), $typed );
+		}
+
+		// The reduced request is tried for plain rules only.
+		$this->assertNull( $this->location_for( '/caf%C3%A9', '^/caf$: /x' ) );
+	}
+
+	/**
+	 * The 404 log records the request the way the matcher reads it, so a rule copied from it fires.
+	 */
+	public function test_404_log_records_request_as_matched() {
+		global $wp_query;
+
+		update_option( 'redirect_txt_settings', array( '404_logs' => 1 ) );
+		Redirect_Txt_Logs::update_logs( array() );
+		$request                = '/%D0%BA%D0%B0%D1%84%D0%B5';
+		$_SERVER['REQUEST_URI'] = $request;
+		$wp_query->set_404();
+
+		Redirect_Txt_Logs::maybe_log_404();
+
+		$logs = Redirect_Txt_Logs::get_logs();
+		$this->assertSame( $request, $logs[0]['url_from'] );
+		$this->assertStringEndsWith( '/cafe', (string) $this->location_for( $request, $logs[0]['url_from'] . ': /cafe' ) );
+	}
+
+	/**
+	 * A host built from the request keeps the case the request gave it.
+	 */
+	public function test_regex_host_case_is_kept() {
+		$this->assertSame( 'https://Blog.example.com/', $this->location_for( '/u/Blog', '^/u/([^/]+)$: https://$1.example.com/' ) );
+		$this->assertSame( 'https://Blog.Example.com/', $this->location_for( '/u/Blog', '^/u/([^/]+)$: https://$1.Example.com/' ) );
+	}
+
+	/**
+	 * A reference that picks the registrable domain, or the whole host, is not whitelisted.
+	 */
+	public function test_regex_host_without_fixed_domain_is_not_whitelisted() {
+		$home_host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		$this->assertSame( $home_host, wp_parse_url( (string) $this->location_for( '/go/evil', '^/go/([a-z]+)$: https://www.$1.com/' ), PHP_URL_HOST ) );
+		$this->assertSame( $home_host, wp_parse_url( (string) $this->location_for( '/out/134744072', '^/out/([^/]+)$: https://$1/' ), PHP_URL_HOST ) );
+	}
+
+	/**
+	 * A protected path added as a full path under a subdirectory home still protects.
+	 */
+	public function test_protected_full_path_from_filter() {
+		add_filter(
+			'home_url',
+			static function ( $url ) {
+				return false === strpos( $url, '/blog' ) ? rtrim( $url, '/' ) . '/blog' : $url;
+			}
+		);
+		$add_members = static function ( $paths ) {
+			$paths[] = '/blog/members/';
+
+			return $paths;
+		};
+		add_filter( 'redirect_txt_protected_paths', $add_members );
+
+		$this->assertTrue( Redirect_Txt_Redirects::is_protected_path( '/blog/members/x' ) );
+		$this->assertTrue( Redirect_Txt_Redirects::is_protected_path( '/blog/wp-admin' ) );
+		$this->assertFalse( Redirect_Txt_Redirects::is_protected_path( '/blog/other' ) );
+
+		remove_filter( 'redirect_txt_protected_paths', $add_members );
+	}
+
+	/**
+	 * A plain rule with `+` matches the same request, as `from` is url-decoded too.
+	 */
+	public function test_plus_in_plain_rule_matches() {
+		$this->assertStringEndsWith( '/x', (string) $this->location_for( '/a+b', '/a+b: /x' ) );
+		$this->assertStringEndsWith( '/cpp', (string) $this->location_for( '/c++-guide', '/c++-guide: /cpp' ) );
+	}
 }
