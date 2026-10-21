@@ -668,6 +668,81 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * Host a rule's target is allowed to send the visitor to.
+	 *
+	 * Read from the target as written, before regex substitution. When the host
+	 * is built from `$1` or `\1`, the substituted host is whitelisted only if
+	 * every reference filled in a single DNS label, so `https://$1.example.com/`
+	 * keeps working for `blog.example.com` but a request cannot pick another
+	 * domain; otherwise wp_safe_redirect falls back to the site.
+	 *
+	 * @param string $target Target as written in the rule, or a permalink.
+	 * @param string $resolved Target after regex substitution.
+	 * @return string Host, or '' when there is none to whitelist.
+	 */
+	private static function rule_target_host( $target, $resolved = '' ) {
+		$target = self::format_target_url( $target );
+
+		if ( ! self::is_absolute_url( $target ) ) {
+			return '';
+		}
+
+		// Scheme and authority: everything up to the first `/`, `?` or `#` after `://`.
+		$authority = preg_replace( '#^[a-z]+://([^/?\#]*).*$#is', '$1', $target );
+		$reference = '/\$\{?\d+\}?|\\\\\d+/';
+
+		if ( ! preg_match( $reference, $authority ) ) {
+			$parsed = wp_parse_url( $target );
+
+			return is_array( $parsed ) && ! empty( $parsed['host'] ) ? $parsed['host'] : '';
+		}
+
+		$parsed = wp_parse_url( $resolved );
+		$host   = is_array( $parsed ) && ! empty( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+
+		// The template host with each reference standing for one DNS label.
+		$template = strtolower( preg_replace( '/^[^@]*@|:\d+$/', '', $authority ) );
+		$parts    = preg_split( $reference, $template );
+		$pattern  = '/^' . implode( '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', array_map( 'preg_quote', $parts, array_fill( 0, count( $parts ), '/' ) ) ) . '$/';
+
+		return $host && preg_match( $pattern, $host ) ? $host : '';
+	}
+
+	/**
+	 * Whether a regex `from` compiles.
+	 *
+	 * @param string $pattern Regular expression without delimiters.
+	 * @return bool
+	 */
+	public static function is_valid_regex( $pattern ) {
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- the warning is the failure we report.
+		return false !== @preg_match( self::delimited_pattern( $pattern ), '' );
+	}
+
+	/**
+	 * First line of a rules string whose regex `from` does not compile.
+	 *
+	 * @param string $rules Rules as entered.
+	 * @return array|null Array with `number` (1-based) and `line`, or null when all compile.
+	 */
+	public static function find_invalid_regex_line( $rules ) {
+		$lines = preg_split( "/\r\n|\n|\r/", $rules );
+
+		foreach ( $lines as $index => $line ) {
+			foreach ( self::parse_redirect_rules( $line, true, true ) as $redirect ) {
+				if ( 'regex' === self::get_url_type( $redirect['from'] ) && ! self::is_valid_regex( $redirect['from'] ) ) {
+					return array(
+						'number' => $index + 1,
+						'line'   => trim( $line ),
+					);
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Check if URL match any of rules and return it.
 	 *
 	 * @param string $url - full URL to check if it match anything in rules list.
@@ -764,7 +839,7 @@ class Redirect_Txt_Redirects {
 
 			// Redirect from current post ID.
 			if ( 'id' === $from_type ) {
-				if ( $from === $queried_object->ID ) {
+				if ( $queried_object instanceof WP_Post && $from === $queried_object->ID ) {
 					$from         = get_permalink( $from );
 					$matched_path = true;
 				} else {
@@ -781,8 +856,9 @@ class Redirect_Txt_Redirects {
 			}
 
 			if ( ! $matched_path ) {
+				// `from` is url-decoded by format_url, so compare it with the decoded request.
 				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_url_no_query ) ) ? $normalized_requested_url_no_query : $normalized_requested_url;
-				$matched_path = $to_match === $from;
+				$matched_path = rawurldecode( $to_match ) === $from;
 			}
 
 			if ( $matched_path ) {
@@ -805,15 +881,10 @@ class Redirect_Txt_Redirects {
 				 * host this redirect is about to send.
 				 */
 				if ( ! self::$checking_repeat ) {
-					if ( function_exists( 'wp_parse_url' ) ) {
-						$parsed_redirect = wp_parse_url( $to );
-					} else {
-						// phpcs:ignore
-						$parsed_redirect = parse_url( $to );
-					}
+					$whitelist_host = self::rule_target_host( 'id' === $to_type ? $to : $redirect['to'], $to );
 
-					if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
-						self::$whitelist_host = $parsed_redirect['host'];
+					if ( $whitelist_host ) {
+						self::$whitelist_host = $whitelist_host;
 						add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
 					}
 				}
@@ -902,14 +973,27 @@ class Redirect_Txt_Redirects {
 	 * @return bool
 	 */
 	public static function is_protected_path( $request ) {
-		$request = rtrim( $request, '/' );
+		// A REST request on plain permalinks: `/?rest_route=/wp/v2/posts`.
+		$query = wp_parse_url( $request, PHP_URL_QUERY );
+
+		if ( $query ) {
+			$query_args = array();
+			wp_parse_str( $query, $query_args );
+
+			if ( ! empty( $query_args['rest_route'] ) ) {
+				return true;
+			}
+		}
+
+		// Protected paths are relative to the install, so `/blog/wp-json/` is `/wp-json/`.
+		$request = rtrim( self::strip_home_path( $request ), '/' );
 
 		$protected = apply_filters(
 			'redirect_txt_protected_paths',
 			[
 				'/wp-login.php',
 				'/wp-admin/',
-				'/wp-json/',
+				'/' . rest_get_url_prefix() . '/',
 			]
 		);
 
@@ -941,7 +1025,10 @@ class Redirect_Txt_Redirects {
 			return;
 		}
 
-		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
+		// sanitize_text_field would drop %-encoded octets, so `/caf%C3%A9` could never match.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw below.
+		$requested_url = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $requested_url ) );
 
 		/**
 		 * The trailing slash goes before matching, and it has to. A rule anchored with

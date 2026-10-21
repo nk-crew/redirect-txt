@@ -87,7 +87,30 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 		$new_rules = $req->get_param( 'rules' );
 
 		if ( isset( $new_rules ) ) {
-			update_option( 'redirect_txt_rules', sanitize_textarea_field( $new_rules ), false );
+			if ( ! is_string( $new_rules ) ) {
+				return $this->error( 'invalid_rules', __( 'Rules must be a string.', 'redirect-txt' ), false, 400 );
+			}
+
+			// Rules are matched as written: sanitize_textarea_field would strip `%C3%A9` and `(?<name>)`.
+			$new_rules = str_replace( "\0", '', wp_check_invalid_utf8( $new_rules, true ) );
+
+			$invalid = Redirect_Txt_Redirects::find_invalid_regex_line( $new_rules );
+
+			if ( $invalid ) {
+				return $this->error(
+					'invalid_regex',
+					sprintf(
+						// translators: %1$d - line number, %2$s - rule line.
+						__( 'Line %1$d has an invalid regular expression: %2$s', 'redirect-txt' ),
+						$invalid['number'],
+						$invalid['line']
+					),
+					false,
+					400
+				);
+			}
+
+			update_option( 'redirect_txt_rules', $new_rules, false );
 		}
 
 		return $this->success( true );
@@ -143,11 +166,12 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 	 * @param mixed   $code       error code.
 	 * @param mixed   $response   response data.
 	 * @param boolean $true_error use true error response to stop the code processing.
+	 * @param int     $status     HTTP status.
 	 * @return mixed
 	 */
-	public function error( $code, $response, $true_error = false ) {
+	public function error( $code, $response, $true_error = false, $status = 401 ) {
 		if ( $true_error ) {
-			return new WP_Error( $code, $response, [ 'status' => 401 ] );
+			return new WP_Error( $code, $response, [ 'status' => $status ] );
 		}
 
 		return new WP_REST_Response(
@@ -157,7 +181,7 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 				'error_code' => $code,
 				'response'   => $response,
 			],
-			401
+			$status
 		);
 	}
 }
