@@ -16,6 +16,11 @@ class Redirect_Txt_Logs {
 	const DELETE_HOOK = 'redirect_txt_flush_logs';
 
 	/**
+	 * Entries kept per log: the 404 log and the redirect log.
+	 */
+	const MAX_ENTRIES = 1000;
+
+	/**
 	 * Init.
 	 */
 	public static function init() {
@@ -133,6 +138,22 @@ class Redirect_Txt_Logs {
 
 		array_unshift( $logs, $new_log );
 
+		// Both logs share one option. Count each separately, so a 404 flood does not push out redirects.
+		$counts = array(
+			'404'      => 0,
+			'redirect' => 0,
+		);
+		$logs   = array_values(
+			array_filter(
+				$logs,
+				function ( $log ) use ( &$counts ) {
+					$kind = isset( $log['status'] ) && 404 === (int) $log['status'] ? '404' : 'redirect';
+
+					return ++$counts[ $kind ] <= self::MAX_ENTRIES;
+				}
+			)
+		);
+
 		self::update_logs( $logs );
 	}
 
@@ -153,8 +174,9 @@ class Redirect_Txt_Logs {
 
 		self::store_log(
 			array(
-				// phpcs:ignore
-				'url_from' => isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( $_SERVER['REQUEST_URI'] ) : '',
+				// The form the matcher reads, so a rule copied from the log matches this request.
+				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw.
+				'url_from' => isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
 				'status'   => 404,
 			)
 		);

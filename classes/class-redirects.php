@@ -75,12 +75,14 @@ class Redirect_Txt_Redirects {
 	 * whitespace. Leaves the case and the trailing slash alone; the two callers below
 	 * want different things from those.
 	 *
-	 * @param string $url - url string.
+	 * @param string $url    - url string.
+	 * @param bool   $is_path - decode `+` as a literal plus, as in a request path.
 	 *
 	 * @return string
 	 */
-	private static function normalize_url( $url ) {
-		$url = urldecode( html_entity_decode( trim( $url ) ) );
+	private static function normalize_url( $url, $is_path = false ) {
+		$url = html_entity_decode( trim( $url ) );
+		$url = $is_path ? rawurldecode( $url ) : urldecode( $url );
 
 		if ( '' === $url ) {
 			return '';
@@ -128,7 +130,7 @@ class Redirect_Txt_Redirects {
 	 * @return string
 	 */
 	public static function format_url( $url ) {
-		$url = self::normalize_url( $url );
+		$url = self::normalize_url( $url, true );
 
 		// An absolute URL is matched as written.
 		if ( self::is_absolute_url( $url ) ) {
@@ -661,10 +663,101 @@ class Redirect_Txt_Redirects {
 		$without_www = preg_replace( '/^www\./i', '', self::$whitelist_host );
 		$with_www    = 'www.' . $without_www;
 
+		// wp_validate_redirect compares the Location host with these case-sensitively.
 		$hosts[] = $without_www;
 		$hosts[] = $with_www;
+		$hosts[] = strtolower( $without_www );
+		$hosts[] = strtolower( $with_www );
 
 		return array_unique( $hosts );
+	}
+
+	/**
+	 * Host a rule's target is allowed to send the visitor to.
+	 *
+	 * Read from the target as written, before regex substitution. When the host
+	 * is built from `$1` or `\1`, the substituted host is whitelisted only if the
+	 * template host has at least two fixed labels to the right of the last
+	 * reference and every reference filled in a single DNS label. So
+	 * `https://$1.example.com/` keeps working for `blog.example.com`, while
+	 * `https://www.$1.com/` and `https://$1/` let the request pick the domain and
+	 * are refused; wp_safe_redirect then falls back to the site. Hosts compare
+	 * case-insensitively, and the host is returned as the Location carries it.
+	 *
+	 * @param string $target Target as written in the rule, or a permalink.
+	 * @param string $resolved Target after regex substitution.
+	 * @return string Host, or '' when there is none to whitelist.
+	 */
+	private static function rule_target_host( $target, $resolved = '' ) {
+		$target = self::format_target_url( $target );
+
+		if ( ! self::is_absolute_url( $target ) ) {
+			return '';
+		}
+
+		// Scheme and authority: everything up to the first `/`, `?` or `#` after `://`.
+		$authority = preg_replace( '#^[a-z]+://([^/?\#]*).*$#is', '$1', $target );
+		$reference = '/\$\{?\d+\}?|\\\\\d+/';
+
+		if ( ! preg_match( $reference, $authority ) ) {
+			$parsed = wp_parse_url( $target );
+
+			return is_array( $parsed ) && ! empty( $parsed['host'] ) ? $parsed['host'] : '';
+		}
+
+		$parsed = wp_parse_url( $resolved );
+		$host   = is_array( $parsed ) && ! empty( $parsed['host'] ) ? $parsed['host'] : '';
+
+		// The template host with each reference standing for one DNS label.
+		$template = preg_replace( '/^[^@]*@|:\d+$/', '', $authority );
+		$parts    = preg_split( $reference, $template );
+
+		// Labels after the last reference: the first piece shares its label with the reference.
+		$suffix = end( $parts );
+		$dot    = strpos( $suffix, '.' );
+		$fixed  = false === $dot ? array() : array_filter( explode( '.', substr( $suffix, $dot + 1 ) ), 'strlen' );
+
+		if ( count( $parts ) > 1 && count( $fixed ) < 2 ) {
+			return '';
+		}
+
+		$pattern = '/^' . implode( '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', array_map( 'preg_quote', $parts, array_fill( 0, count( $parts ), '/' ) ) ) . '$/i';
+
+		return $host && preg_match( $pattern, $host ) ? $host : '';
+	}
+
+	/**
+	 * Whether a regex `from` compiles.
+	 *
+	 * @param string $pattern Regular expression without delimiters.
+	 * @return bool
+	 */
+	public static function is_valid_regex( $pattern ) {
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- the warning is the failure we report.
+		return false !== @preg_match( self::delimited_pattern( $pattern ), '' );
+	}
+
+	/**
+	 * First line of a rules string whose regex `from` does not compile.
+	 *
+	 * @param string $rules Rules as entered.
+	 * @return array|null Array with `number` (1-based) and `line`, or null when all compile.
+	 */
+	public static function find_invalid_regex_line( $rules ) {
+		$lines = preg_split( "/\r\n|\n|\r/", $rules );
+
+		foreach ( $lines as $index => $line ) {
+			foreach ( self::parse_redirect_rules( $line, true, true ) as $redirect ) {
+				if ( 'regex' === self::get_url_type( $redirect['from'] ) && ! self::is_valid_regex( $redirect['from'] ) ) {
+					return array(
+						'number' => $index + 1,
+						'line'   => trim( $line ),
+					);
+				}
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -674,10 +767,11 @@ class Redirect_Txt_Redirects {
 	 * @param string $rules - rules list.
 	 * @param bool   $allow_url_only_redirects - allow redirecting using URLs only.
 	 * @param bool   $allow_post_from - allow redirecting from post IDs.
+	 * @param bool   $plain_only - match plain URL rules only, skipping regex and post ID rules.
 	 *
 	 * @return bool|array
 	 */
-	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false ) {
+	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false, $plain_only = false ) {
 		global $wp_query;
 
 		$redirects = self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
@@ -731,6 +825,10 @@ class Redirect_Txt_Redirects {
 			$to_type      = self::get_url_type( $redirect['to'] );
 			$matched_path = false;
 
+			if ( $plain_only && 'url' !== $from_type ) {
+				continue;
+			}
+
 			// Post ID.
 			if ( 'id' === $from_type ) {
 				$from = (int) $redirect['from'];
@@ -764,7 +862,7 @@ class Redirect_Txt_Redirects {
 
 			// Redirect from current post ID.
 			if ( 'id' === $from_type ) {
-				if ( $from === $queried_object->ID ) {
+				if ( $queried_object instanceof WP_Post && $from === $queried_object->ID ) {
 					$from         = get_permalink( $from );
 					$matched_path = true;
 				} else {
@@ -781,8 +879,9 @@ class Redirect_Txt_Redirects {
 			}
 
 			if ( ! $matched_path ) {
+				// format_url runs `from` through rawurldecode, so decode the request the same way (`+` stays a plus).
 				$to_match     = ( ! $match_query_params && ! empty( $normalized_requested_url_no_query ) ) ? $normalized_requested_url_no_query : $normalized_requested_url;
-				$matched_path = $to_match === $from;
+				$matched_path = rawurldecode( $to_match ) === $from;
 			}
 
 			if ( $matched_path ) {
@@ -805,15 +904,10 @@ class Redirect_Txt_Redirects {
 				 * host this redirect is about to send.
 				 */
 				if ( ! self::$checking_repeat ) {
-					if ( function_exists( 'wp_parse_url' ) ) {
-						$parsed_redirect = wp_parse_url( $to );
-					} else {
-						// phpcs:ignore
-						$parsed_redirect = parse_url( $to );
-					}
+					$whitelist_host = self::rule_target_host( 'id' === $to_type ? $to : $redirect['to'], $to );
 
-					if ( is_array( $parsed_redirect ) && ! empty( $parsed_redirect['host'] ) ) {
-						self::$whitelist_host = $parsed_redirect['host'];
+					if ( $whitelist_host ) {
+						self::$whitelist_host = $whitelist_host;
 						add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
 					}
 				}
@@ -878,10 +972,11 @@ class Redirect_Txt_Redirects {
 	 * Check if URL match any of redirect rules and return it.
 	 *
 	 * @param string $requested_url - url to check.
+	 * @param bool   $plain_only - match plain URL rules only.
 	 *
 	 * @return bool|array
 	 */
-	public static function match_redirect( $requested_url ) {
+	public static function match_redirect( $requested_url, $plain_only = false ) {
 		global $wp_query;
 
 		// Allow redirects from post IDs.
@@ -890,7 +985,7 @@ class Redirect_Txt_Redirects {
 		$allow_post_from          = (bool) $wp_query->get_queried_object();
 		$rules                    = get_option( 'redirect_txt_rules', '' );
 
-		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from );
+		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from, $plain_only );
 	}
 
 	/**
@@ -902,26 +997,47 @@ class Redirect_Txt_Redirects {
 	 * @return bool
 	 */
 	public static function is_protected_path( $request ) {
-		$request = rtrim( $request, '/' );
+		// A REST request on plain permalinks: `/?rest_route=/wp/v2/posts`.
+		$query = wp_parse_url( $request, PHP_URL_QUERY );
+
+		if ( $query ) {
+			$query_args = array();
+			wp_parse_str( $query, $query_args );
+
+			if ( ! empty( $query_args['rest_route'] ) ) {
+				return true;
+			}
+		}
+
+		// Protected paths are relative to the install, so `/blog/wp-json/` is `/wp-json/`.
+		// The full path is checked too, for filter callbacks that add `/blog/members/`.
+		$requests = array_unique(
+			array(
+				rtrim( self::strip_home_path( $request ), '/' ),
+				rtrim( $request, '/' ),
+			)
+		);
 
 		$protected = apply_filters(
 			'redirect_txt_protected_paths',
 			[
 				'/wp-login.php',
 				'/wp-admin/',
-				'/wp-json/',
+				'/' . rest_get_url_prefix() . '/',
 			]
 		);
 
 		$not_protected = array_filter(
 			$protected,
-			function ( $base ) use ( $request ) {
-				if (
-					$base === $request ||
-					rtrim( $base, '/' ) === $request ||
-					substr( $request, 0, strlen( $base ) ) === $base
-				) {
-					return true;
+			function ( $base ) use ( $requests ) {
+				foreach ( $requests as $request ) {
+					if (
+						$base === $request ||
+						rtrim( $base, '/' ) === $request ||
+						substr( $request, 0, strlen( $base ) ) === $base
+					) {
+						return true;
+					}
 				}
 
 				return false;
@@ -941,7 +1057,10 @@ class Redirect_Txt_Redirects {
 			return;
 		}
 
-		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ?? '' ) );
+		// sanitize_text_field would drop %-encoded octets, so `/caf%C3%A9` could never match.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw below.
+		$requested_url = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $requested_url ) );
 
 		/**
 		 * The trailing slash goes before matching, and it has to. A rule anchored with
@@ -960,6 +1079,21 @@ class Redirect_Txt_Redirects {
 		}
 
 		$match_redirect = self::match_redirect( $requested_url );
+
+		/**
+		 * Rules saved by earlier versions went through sanitize_textarea_field, which drops
+		 * %-octets: `/caf%C3%A9` was stored as `/caf`. The request lost the same octets,
+		 * so they matched. Try plain rules once more against the request reduced that way.
+		 */
+		if ( ! $match_redirect ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitize_text_field is the old reduction, esc_url_raw follows.
+			$legacy_url = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+			$legacy_url = untrailingslashit( stripslashes( esc_url_raw( apply_filters( 'redirect_txt_requested_url', $legacy_url ) ) ) );
+
+			if ( $legacy_url !== $requested_url ) {
+				$match_redirect = self::match_redirect( $legacy_url, true );
+			}
+		}
 
 		if ( ! $match_redirect ) {
 			return;

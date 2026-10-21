@@ -19,6 +19,7 @@ function reducer(
 				...state,
 				updating: false,
 				rules: action.rules,
+				error: '',
 			};
 		case 'UPDATE_RULES_ERROR':
 			return {
