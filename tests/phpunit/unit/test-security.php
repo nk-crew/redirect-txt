@@ -387,4 +387,13 @@ class SecurityTest extends WP_UnitTestCase {
 	public function test_regex_decoded_match_to_itself_is_a_loop() {
 		$this->assertNull( $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5', '^/кафе/?$: /%D0%BA%D0%B0%D1%84%D0%B5/' ) );
 	}
+
+	/**
+	 * An escaped ASCII octet in a group keeps its escape when the rule matched the decoded form.
+	 */
+	public function test_regex_decoded_match_keeps_ascii_escapes_in_groups() {
+		$location = (string) $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5/a%252Fb', '^/кафе/(.*)$: /dest/$1' );
+
+		$this->assertStringEndsWith( '/dest/a%2Fb', $location );
+	}
 }

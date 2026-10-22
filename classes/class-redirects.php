@@ -237,11 +237,14 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
-	 * The form of a request path a regex rule matches: as requested, else %-decoded.
+	 * The form of a request path a regex rule matches: as requested, else with non-ASCII decoded.
 	 *
 	 * A pattern written with literal non-ASCII, such as `^/кафе$`, never matches the
 	 * %-encoded request. The raw form goes first, so rules that matched it keep
-	 * their groups. The decoded form is tried only when it differs and is valid UTF-8.
+	 * their groups. The second form decodes only the octets of non-ASCII characters:
+	 * an escape such as `%252F` stays as it was, because the target is decoded once
+	 * more and a decoded `%2F` would become a slash. It is tried only when it differs
+	 * and is valid UTF-8.
 	 *
 	 * @param string $delimited Delimited pattern.
 	 * @param string $url       Request path.
@@ -252,7 +255,13 @@ class Redirect_Txt_Redirects {
 			return $url;
 		}
 
-		$decoded = rawurldecode( $url );
+		$decoded = preg_replace_callback(
+			'/%[89a-f][0-9a-f]/i',
+			static function ( $octet ) {
+				return chr( hexdec( substr( $octet[0], 1 ) ) );
+			},
+			$url
+		);
 
 		if ( $decoded !== $url && preg_match( '//u', $decoded ) && preg_match( $delimited, $decoded ) ) {
 			return $decoded;
