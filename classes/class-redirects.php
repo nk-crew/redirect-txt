@@ -237,6 +237,40 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
+	 * The form of a request path a regex rule matches: as requested, else with non-ASCII decoded.
+	 *
+	 * A pattern written with literal non-ASCII, such as `^/кафе$`, never matches the
+	 * %-encoded request. The raw form goes first, so rules that matched it keep
+	 * their groups. The second form decodes only the octets of non-ASCII characters:
+	 * an escape such as `%252F` stays as it was, because the target is decoded once
+	 * more and a decoded `%2F` would become a slash. It is tried only when it differs
+	 * and is valid UTF-8.
+	 *
+	 * @param string $delimited Delimited pattern.
+	 * @param string $url       Request path.
+	 * @return string|null The form that matched, or null.
+	 */
+	private static function regex_subject( $delimited, $url ) {
+		if ( preg_match( $delimited, $url ) ) {
+			return $url;
+		}
+
+		$decoded = preg_replace_callback(
+			'/%[89a-f][0-9a-f]/i',
+			static function ( $octet ) {
+				return chr( hexdec( substr( $octet[0], 1 ) ) );
+			},
+			$url
+		);
+
+		if ( $decoded !== $url && preg_match( '//u', $decoded ) && preg_match( $delimited, $decoded ) ) {
+			return $decoded;
+		}
+
+		return null;
+	}
+
+	/**
 	 * A 3xx sends a Location. The 4xx codes are answers, not redirects.
 	 *
 	 * @param int $status HTTP status from the rule.
@@ -875,7 +909,8 @@ class Redirect_Txt_Redirects {
 			// RegEx.
 			if ( 'regex' === $from_type ) {
 				$match_query_params = false;
-				$matched_path       = preg_match( self::delimited_pattern( $from ), $url );
+				$regex_subject      = self::regex_subject( self::delimited_pattern( $from ), $url );
+				$matched_path       = null !== $regex_subject;
 			}
 
 			if ( ! $matched_path ) {
@@ -892,7 +927,7 @@ class Redirect_Txt_Redirects {
 
 				// Regex URL.
 				if ( 'regex' === $from_type ) {
-					$to   = preg_replace( self::delimited_pattern( $from ), $to, $url );
+					$to   = preg_replace( self::delimited_pattern( $from ), $to, $regex_subject );
 					$to   = self::format_target_url( $to );
 					$from = $url;
 				}

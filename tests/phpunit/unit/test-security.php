@@ -343,4 +343,57 @@ class SecurityTest extends WP_UnitTestCase {
 		$this->assertStringEndsWith( '/cpp', (string) $this->location_for( '/c++-guide', '/c++-guide: /cpp' ) );
 		$this->assertNull( $this->location_for( '/a+b', '/a%20b: /space' ) );
 	}
+
+	/**
+	 * A regex rule written with literal non-ASCII matches the %-encoded request.
+	 */
+	public function test_regex_with_literal_non_ascii_matches_encoded_request() {
+		$this->assertStringEndsWith( '/cafe', (string) $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5', '^/кафе$: /cafe' ) );
+		$this->assertNull( $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5-x', '^/кафе$: /cafe' ) );
+	}
+
+	/**
+	 * A group takes its text from the form that matched: raw first, decoded only when raw fails.
+	 *
+	 * format_target_url decodes every target, and wp_safe_redirect encodes it again,
+	 * so both forms send the same Location.
+	 */
+	public function test_regex_group_takes_the_form_that_matched() {
+		$slug = '/%D0%BA%D0%B0%D1%84%D0%B5';
+		$news = '/%D0%BD%D0%BE%D0%B2%D0%BE%D1%81%D1%82%D0%B8';
+
+		// The raw request matches, so the group holds the %-encoded slug, as it did before.
+		$raw = Redirect_Txt_Redirects::match_url_to_rules( '/news' . $slug, '^/news/(.+)$: /blog/$1' );
+		$this->assertSame( '/blog/кафе', $raw['to'] );
+		$this->assertStringEndsWith( '/blog' . $slug, (string) $this->location_for( '/news' . $slug, '^/news/(.+)$: /blog/$1' ) );
+
+		// Only the decoded request matches, so the group holds the decoded slug.
+		$decoded = Redirect_Txt_Redirects::match_url_to_rules( $news . $slug, '^/новости/(.+)$: /blog/$1' );
+		$this->assertSame( '/blog/кафе', $decoded['to'] );
+		$this->assertSame( $news . $slug, $decoded['from'] );
+		$this->assertStringEndsWith( '/blog' . $slug, (string) $this->location_for( $news . $slug, '^/новости/(.+)$: /blog/$1' ) );
+	}
+
+	/**
+	 * A regex rule written %-encoded matches the raw request as before.
+	 */
+	public function test_regex_with_encoded_pattern_still_matches() {
+		$this->assertStringEndsWith( '/cafe', (string) $this->location_for( '/caf%C3%A9', '^/caf%C3%A9$: /cafe' ) );
+	}
+
+	/**
+	 * A decoded match whose target is the same page encoded is a loop and is skipped.
+	 */
+	public function test_regex_decoded_match_to_itself_is_a_loop() {
+		$this->assertNull( $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5', '^/кафе/?$: /%D0%BA%D0%B0%D1%84%D0%B5/' ) );
+	}
+
+	/**
+	 * An escaped ASCII octet in a group keeps its escape when the rule matched the decoded form.
+	 */
+	public function test_regex_decoded_match_keeps_ascii_escapes_in_groups() {
+		$location = (string) $this->location_for( '/%D0%BA%D0%B0%D1%84%D0%B5/a%252Fb', '^/кафе/(.*)$: /dest/$1' );
+
+		$this->assertStringEndsWith( '/dest/a%2Fb', $location );
+	}
 }
