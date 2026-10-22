@@ -3,8 +3,8 @@ Contributors: nko
 Tags: 301, 404, redirect, redirection, redirects
 Requires at least: 6.2
 Tested up to: 7.1
-Requires PHP: 7.4
-Stable tag: 0.2.8
+Requires PHP: 8.3
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,18 @@ Install the Redirect.txt either via the WordPress plugin directory or by uploadi
 To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect.txt and follow instructions.
 
 == Changelog ==
+
+= 0.3.0 - Oct 22, 2026 =
+
+- bump minimum PHP requirement to 8.3
+- security: fixed an open redirect where a RegEx rule that builds the target domain from the request could send visitors to any other site; a matched part may now only fill a subdomain of the domain written in the rule
+- fixed rules losing `%`-encoded characters and RegEx syntax such as named groups `(?<name>...)` on save; rules are now saved exactly as written, and an invalid RegEx is refused with the line that fails
+- rules saved by earlier versions keep matching the same URLs as before
+- fixed URLs from the 404 log not matching when copied into a rule
+- fixed rules redirecting REST API requests on sites with plain permalinks or with WordPress installed in a subdirectory
+- fixed a numeric rule, such as `/123`, also matching an author or term with that ID; it now matches posts only
+- the redirect log and the 404 log now each keep the newest 1000 entries
+- fixed RegEx rules with non-Latin characters, such as `^/кафе$`, never matching
 
 = 0.2.8 - Sep 23, 2026 =
 
