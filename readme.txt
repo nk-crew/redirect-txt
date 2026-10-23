@@ -84,6 +84,7 @@ To start using the Redirect.txt, just open the Admin Menu → Tools → Redirect
 
 = 0.3.0 - Oct 22, 2026 =
 
+- added WordPress 7.2 compatibility
 - bump minimum PHP requirement to 8.3
 - security: fixed an open redirect where a RegEx rule that builds the target domain from the request could send visitors to any other site; a matched part may now only fill a subdomain of the domain written in the rule
 - fixed rules losing `%`-encoded characters and RegEx syntax such as named groups `(?<name>...)` on save; rules are now saved exactly as written, and an invalid RegEx is refused with the line that fails
