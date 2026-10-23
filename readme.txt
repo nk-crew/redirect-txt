@@ -2,7 +2,7 @@
 Contributors: nko
 Tags: 301, 404, redirect, redirection, redirects
 Requires at least: 6.2
-Tested up to: 7.1
+Tested up to: 7.2
 Requires PHP: 8.3
 Stable tag: 0.3.0
 License: GPL-2.0-or-later
