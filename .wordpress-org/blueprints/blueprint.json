@@ -1,0 +1,32 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"landingPage": "/wp-admin/tools.php?page=redirect-txt",
+	"preferredVersions": {
+		"php": "8.3",
+		"wp": "latest"
+	},
+	"features": {
+		"networking": true
+	},
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "redirect-txt"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "login",
+			"username": "admin",
+			"password": "password"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php\nrequire '/wordpress/wp-load.php';\nwp_set_current_user( 1 );\n\n$home  = untrailingslashit( home_url() );\n$post  = substr( get_permalink( 1 ), strlen( $home ) );\n$rules = <<<RULES\n# Every line below is a live redirect on this site. Try two of them:\n#   {$home}/about-us\n#   {$home}/blog{$post}\n# Edit the list, then press Save Changes (or Cmd/Ctrl + S).\n\n# Plain paths. Rules use 301 (Moved Permanently) until a status line changes it.\n/about-us: /sample-page/\n/team: /sample-page/#team\n\n# A number on the right is a post or page ID, so the link survives a slug change.\n/welcome: 1\n\n# External targets.\n/docs: https://wordpress.org/plugins/redirect-txt/\n\n# Regular expressions start with ^. \\$1, \\$2... insert the captured groups.\n# The blog moved from /blog/ to the site root:\n^/blog/(.*): /\\$1/\n\n# Status lines. Every rule after \"302:\" uses 302 (Found), a temporary redirect.\n302:\n/summer-sale: /sample-page/\n\n# 410 tells visitors and search engines the page is gone for good.\n410:\n/discontinued-product: /discontinued-product\nRULES;\n\n$request = new WP_REST_Request( 'POST', '/redirect-txt/v1/update_rules' );\n$request->set_param( 'rules', $rules );\n$response = rest_do_request( $request );\nif ( $response->is_error() || empty( $response->get_data()['success'] ) ) {\n\tthrow new Exception( 'Redirect.txt rules were not saved: ' . wp_json_encode( $response->get_data() ) );\n}\n\n$request = new WP_REST_Request( 'POST', '/redirect-txt/v1/update_settings' );\n$request->set_param( 'settings', array( 'redirect_logs' => 7, '404_logs' => 7 ) );\nrest_do_request( $request );\n"
+		}
+	]
+}
