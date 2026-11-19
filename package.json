@@ -28,7 +28,7 @@
 		"pretest:unit:php": "wp-env start",
 		"test:unit:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' tests-wordpress vendor/bin/phpunit -c phpunit.xml.dist --verbose",
 		"lint": "concurrently \"npm run lint:js\" \"npm run lint:css\"",
-		"lint:css": "wp-scripts lint-style",
+		"lint:css": "stylelint --custom-syntax postcss-scss \"**/*.{css,pcss,scss}\"",
 		"lint:js": "wp-scripts lint-js",
 		"prelint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer install --no-interaction",
 		"lint:php": "wp-env run --env-cwd='wp-content/plugins/redirect-txt' cli composer run-script lint",
@@ -44,11 +44,11 @@
 		"@babel/plugin-transform-react-jsx": "^7.29.0",
 		"@babel/preset-env": "^7.29.0",
 		"@babel/register": "^7.29.0",
-		"@wordpress/env": "^11.15.0",
-		"@wordpress/eslint-plugin": "^17.13.0",
-		"@wordpress/prettier-config": "^3.15.0",
-		"@wordpress/scripts": "^27.9.0",
-		"@wordpress/stylelint-config": "^21.41.0",
+		"@wordpress/env": "^12.0.0",
+		"@wordpress/eslint-plugin": "^28.2.0",
+		"@wordpress/prettier-config": "^5.2.0",
+		"@wordpress/scripts": "^37.2.0",
+		"@wordpress/stylelint-config": "^23.42.0",
 		"concurrently": "^8.2.2",
 		"gulp": "^5.0.1",
 		"gulp-change-file-content": "^1.0.1",
@@ -57,7 +57,10 @@
 		"path": "^0.12.7",
 		"po2json": "^0.4.5",
 		"prettier": "^3.8.0",
-		"yargs": "^17.7.2"
+		"yargs": "^17.7.2",
+		"stylelint": "^16.26.1",
+		"stylelint-scss": "^6.14.0",
+		"postcss-scss": "^4.0.9"
 	},
 	"dependencies": {
 		"@uiw/react-textarea-code-editor": "^3.1.1",
@@ -73,5 +76,9 @@
 		"nomnom": {
 			"underscore": "^1.13.8"
 		}
+	},
+	"engines": {
+		"node": "^24.18.0",
+		"npm": ">=11.16.0"
 	}
 }
