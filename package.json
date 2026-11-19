@@ -65,5 +65,13 @@
 		"javascript-time-ago": "^2.6.4",
 		"react-time-ago": "^7.4.4",
 		"react-transition-group": "^4.4.5"
+	},
+	"overrides": {
+		"copy-webpack-plugin": {
+			"serialize-javascript": "^7.1.4"
+		},
+		"nomnom": {
+			"underscore": "^1.13.8"
+		}
 	}
 }
