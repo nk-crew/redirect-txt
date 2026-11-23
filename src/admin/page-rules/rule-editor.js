@@ -2,12 +2,15 @@ import apiFetch from '@wordpress/api-fetch';
 import {
 	useEffect,
 	useLayoutEffect,
+	useMemo,
+	useReducer,
 	useRef,
 	useState,
 } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 import Editor from '../../components/editor';
+import { ruleEditingReducer, visibleRuleIssues } from './rule-editing.mjs';
 
 const editorPadding = 15;
 const noIssues = [];
@@ -123,11 +126,20 @@ function rowAtY(rows, y) {
 	return null;
 }
 
+function lineAtCaret(field) {
+	return field.value.slice(0, field.selectionStart).split('\n').length - 1;
+}
+
 export default function RuleEditor({ rules, onChange }) {
 	const frame = useRef(null);
 	const tooltip = useRef(null);
 	const [active, setActive] = useState(null);
-	const issues = useRuleIssues(rules);
+	const [editedLine, updateEditedLine] = useReducer(ruleEditingReducer, null);
+	const inspectedIssues = useRuleIssues(rules);
+	const issues = useMemo(
+		() => visibleRuleIssues(inspectedIssues, editedLine),
+		[inspectedIssues, editedLine]
+	);
 	const rows = useMarkedRows(frame, issues);
 	const visible = issues.includes(active?.row.issue) ? active : null;
 	const message = visible ? messages[visible.row.issue.code]() : '';
@@ -151,8 +163,8 @@ export default function RuleEditor({ rules, onChange }) {
 			return;
 		}
 
-		const line =
-			field.value.slice(0, field.selectionStart).split('\n').length - 1;
+		const line = lineAtCaret(field);
+		updateEditedLine({ type: 'move', line });
 		show(
 			rows.current.find((row) => row.issue.line === line),
 			true
@@ -251,12 +263,28 @@ export default function RuleEditor({ rules, onChange }) {
 				aria-describedby="redirect-txt-rules-help"
 				placeholder={__('Enter rules…', 'redirect-txt')}
 				onChange={(event) => {
+					updateEditedLine({
+						type: 'input',
+						line: lineAtCaret(event.currentTarget),
+					});
 					show(null);
 					onChange(event.target.value);
 				}}
 				onMouseDown={() => show(null)}
 				onClick={showCaretIssue}
-				onBlur={() => show(null)}
+				onSelect={(event) => {
+					const field = event.currentTarget;
+					if (field.selectionStart === field.selectionEnd) {
+						updateEditedLine({
+							type: 'move',
+							line: lineAtCaret(field),
+						});
+					}
+				}}
+				onBlur={() => {
+					updateEditedLine({ type: 'blur' });
+					show(null);
+				}}
 				onKeyUp={(event) => {
 					if (/^(?:Arrow|Home|End|Page)/.test(event.key)) {
 						showCaretIssue(event);

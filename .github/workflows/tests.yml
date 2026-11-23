@@ -171,6 +171,9 @@ jobs:
       - name: Running the lint
         run: npm run lint
 
+      - name: Run JavaScript unit tests
+        run: npm run test:unit:js
+
   phpcs:
     name: PHP coding standards
     runs-on: ubuntu-latest

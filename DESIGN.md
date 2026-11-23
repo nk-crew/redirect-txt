@@ -8,3 +8,6 @@ inner width and keep the text, caret, and line height aligned. Show one short ex
 in the free space beside the active rule. If space is tight, place it at the edge of the
 editor where it leaves every rule visible. Provide the same explanation to mouse, keyboard,
 and touch users.
+
+Allow users to finish a rule before showing diagnostics for the line they are editing.
+Apply its feedback when the caret moves to another line or the editor loses focus.
