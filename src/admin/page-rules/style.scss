@@ -92,6 +92,12 @@
 	max-width: 420px;
 }
 
+.redirect-txt-draft-review .button {
+	max-width: 100%;
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+
 .redirect-txt-draft-match {
 	strong,
 	> code {

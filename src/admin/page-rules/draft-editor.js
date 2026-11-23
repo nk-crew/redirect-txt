@@ -426,7 +426,7 @@ export default function DraftEditor({ rules, onChange }) {
 				)}
 			</div>
 			{issues.length > 0 && (
-				<div>
+				<div className="redirect-txt-draft-review">
 					<button
 						className="button"
 						type="button"

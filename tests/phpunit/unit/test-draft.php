@@ -176,4 +176,16 @@ class DraftTest extends WP_UnitTestCase {
 		$this->assertSame( 410, $result['status'] );
 		$this->assertNull( $result['location'] );
 	}
+
+	/**
+	 * Testing a decoded URL uses the request path encoding a browser would send.
+	 */
+	public function test_draft_uses_browser_request_path_encoding() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$regex  = $this->inspect( '^/caf%C3%A9$: /coffee/', '/café/' );
+		$legacy = $this->inspect( '/caf: /old-rule/', '/café/' );
+		$this->assertSame( '/coffee/', $regex->get_data()['response']['test']['location'] ?? null );
+		$this->assertSame( '/old-rule/', $legacy->get_data()['response']['test']['location'] ?? null );
+	}
 }

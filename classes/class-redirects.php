@@ -1212,6 +1212,14 @@ class Redirect_Txt_Redirects {
 			return array( 'outcome' => 'invalid_address' );
 		}
 
+		$path = preg_replace_callback(
+			'/[\x80-\xff]/',
+			static function ( $octet ) {
+				return rawurlencode( $octet[0] );
+			},
+			$path
+		);
+
 		$url = self::prepare_requested_url( $path );
 
 		if ( self::is_protected_path( $url ) ) {
