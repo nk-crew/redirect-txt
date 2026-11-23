@@ -51,6 +51,16 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 			]
 		);
 
+		register_rest_route(
+			$namespace,
+			'/inspect_draft/',
+			[
+				'methods'             => [ 'POST' ],
+				'callback'            => [ $this, 'inspect_draft' ],
+				'permission_callback' => [ $this, 'update_rules_permission' ],
+			]
+		);
+
 		// Update Settings.
 		register_rest_route(
 			$namespace,
@@ -97,7 +107,7 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 			$invalid = Redirect_Txt_Redirects::find_invalid_regex_line( $new_rules );
 
 			if ( $invalid ) {
-				return $this->error(
+				$response = $this->error(
 					'invalid_regex',
 					sprintf(
 						// translators: %1$d - line number, %2$s - rule line.
@@ -108,12 +118,40 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 					false,
 					400
 				);
+				$response->set_data( $response->get_data() + array( 'rule' => $invalid['line'] ) );
+
+				return $response;
 			}
 
 			update_option( 'redirect_txt_rules', $new_rules, false );
 		}
 
 		return $this->success( true );
+	}
+
+	/**
+	 * Diagnose rules and test an address without saving the draft.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function inspect_draft( WP_REST_Request $req ) {
+		$rules   = $req->get_param( 'rules' );
+		$address = $req->get_param( 'address' );
+
+		if ( ! is_string( $rules ) || ( null !== $address && ! is_string( $address ) ) ) {
+			return $this->error( 'invalid_draft', __( 'Enter rule text and a site URL or path.', 'redirect-txt' ), true, 400 );
+		}
+
+		if ( strlen( $rules ) > 256 * 1024 || ( null !== $address && strlen( $address ) > 8192 ) ) {
+			return $this->error( 'draft_too_large', __( 'The rule draft or test address is too long to check.', 'redirect-txt' ), true, 413 );
+		}
+
+		if ( wp_check_invalid_utf8( $rules ) !== $rules || false !== strpos( $rules, "\0" ) ) {
+			return $this->error( 'invalid_draft', __( 'The draft contains invalid text.', 'redirect-txt' ), true, 400 );
+		}
+
+		return $this->success( Redirect_Txt_Redirects::inspect_draft( $rules, $address ) );
 	}
 
 	/**

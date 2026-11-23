@@ -1,7 +1,7 @@
 /**
  * WordPress dependencies.
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 
 export function updateRules(rules) {
@@ -26,12 +26,21 @@ export function updateRules(rules) {
 				dispatch({
 					type: 'UPDATE_RULES_ERROR',
 					error:
-						err?.response ||
-						err?.error_code ||
-						__(
-							'Something went wrong, please, try again…',
-							'redirect-txt'
-						),
+						err?.error_code === 'invalid_regex' && err.rule
+							? sprintf(
+									/* translators: %s: Rule with an invalid regular expression. */
+									__(
+										'Invalid regular expression in %s',
+										'redirect-txt'
+									),
+									err.rule
+								)
+							: err?.response ||
+								err?.error_code ||
+								__(
+									'Something went wrong, please, try again…',
+									'redirect-txt'
+								),
 				});
 			});
 	};
