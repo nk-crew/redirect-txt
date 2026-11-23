@@ -165,6 +165,56 @@ class SecurityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Forward request query bytes before the destination fragment.
+	 */
+	public function test_forwards_query_before_target_fragment() {
+		$this->assertSame( '/new/?code=AbC#details', $this->location_for( '/old/?code=AbC', '/old/: /new/#details' ) );
+		$this->assertSame( '/new/?z=%2F&a=Ab%2b+Cd&a=/Path/#details?tab', $this->location_for( '/old/?z=%2F&a=Ab%2b+Cd&a=/Path/', '/old/: /new/#details?tab' ) );
+		$this->assertSame( '/new/?code=AbC/', $this->location_for( '/old/?code=AbC/', '/old/: /new/' ) );
+		$this->assertSame( '/new/#details?tab', $this->location_for( '/old/', '/old/: /new/#details?tab' ) );
+	}
+
+	/**
+	 * A query in the rule keeps its existing precedence.
+	 */
+	public function test_redirect_query_precedence() {
+		$this->assertSame( '/new/?code=Fixed#details', $this->location_for( '/old/?code=AbC', '/old/: /new/?code=Fixed#details' ) );
+		$this->assertSame( '/new/#details', $this->location_for( '/old/?code=AbC', '/old/?code=abc: /new/#details' ) );
+	}
+
+	/**
+	 * A regex replacement can retain the request query in its fragment.
+	 */
+	public function test_regex_fragment_preserves_replacement_and_loop_check() {
+		$this->assertSame( '/new#details?code=/A', $this->location_for( '/old?code=%2FA', '^/old: /new#details' ) );
+		$this->assertNull( $this->location_for( '/old?code=AbC', '^/old: /old#section' ) );
+	}
+
+	/**
+	 * Forward encoded query bytes even when an older rule matches the reduced path.
+	 */
+	public function test_legacy_path_match_forwards_original_query() {
+		$this->assertSame( '/cafe?code=%2FA', $this->location_for( '/caf%C3%A9?code=%2FA', '/caf: /cafe' ) );
+	}
+
+	/**
+	 * An installation subdirectory does not alter the forwarded query.
+	 */
+	public function test_forwards_query_in_a_subdirectory() {
+		$home              = home_url( '/subdir' );
+		$subdirectory_home = static function () use ( $home ) {
+			return $home;
+		};
+		add_filter( 'pre_option_home', $subdirectory_home );
+
+		try {
+			$this->assertSame( '/subdir/new/?code=AbC#details', $this->location_for( '/subdir/old/?code=AbC', '/old/: /new/#details' ) );
+		} finally {
+			remove_filter( 'pre_option_home', $subdirectory_home );
+		}
+	}
+
+	/**
 	 * REST requests on plain permalinks are not redirected.
 	 */
 	public function test_rest_route_query_is_protected() {
