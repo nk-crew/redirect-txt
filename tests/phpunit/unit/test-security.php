@@ -83,36 +83,6 @@ class SecurityTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The draft endpoint and live handler forward the same filtered query.
-	 */
-	public function test_draft_and_live_preserve_filtered_query() {
-		wp_set_current_user( self::$admin_id );
-
-		$query_filter = static function ( $url ) {
-			return str_replace( 'code=AbC', 'code=AbC%2a', $url );
-		};
-		add_filter( 'redirect_txt_requested_url', $query_filter );
-
-		try {
-			$rules    = "/old/: /new/#details\n/caf: /new/#details";
-			$expected = '/new/?code=AbC%2a&encoded=%2F%2f&next=/Orders/#details';
-
-			foreach ( array( '/old/', '/caf%C3%A9/' ) as $path ) {
-				$address = $path . '?code=AbC&encoded=%2F%2f&next=/Orders/';
-				$request = new WP_REST_Request( 'POST', '/redirect-txt/v1/inspect_draft' );
-				$request->set_param( 'rules', $rules );
-				$request->set_param( 'address', $address );
-
-				$preview = rest_do_request( $request )->get_data()['response']['test'];
-				$this->assertSame( $expected, $preview['location'], $address );
-				$this->assertSame( $expected, $this->location_for( $address, $rules ), $address );
-			}
-		} finally {
-			remove_filter( 'redirect_txt_requested_url', $query_filter );
-		}
-	}
-
-	/**
 	 * A host built from the request is not whitelisted.
 	 */
 	public function test_regex_host_from_request_is_not_whitelisted() {

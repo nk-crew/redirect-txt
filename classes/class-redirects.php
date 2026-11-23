@@ -31,11 +31,6 @@ class Redirect_Txt_Redirects {
 	private static $checking_repeat = false;
 
 	/**
-	 * Bound preview work when checking each possible redirect chain.
-	 */
-	private const MAX_PREVIEW_RULES = 512;
-
-	/**
 	 * Redirect_Txt_Redirects constructor.
 	 */
 	public static function init() {
@@ -614,86 +609,129 @@ class Redirect_Txt_Redirects {
 	 * @return array
 	 */
 	public static function parse_redirect_rules( $rules, $allow_url_only_redirects = true, $allow_post_from = false ) {
-		return array_values( self::parse_rule_lines( $rules, $allow_url_only_redirects, $allow_post_from ) );
+		return self::parse_rules( $rules, $allow_url_only_redirects, $allow_post_from );
 	}
 
 	/**
-	 * Parse rules keyed by their zero-based position in the editor.
+	 * Inspect each line using the same grammar as the redirect handler.
 	 *
-	 * @param string     $rules                   Rules as entered.
-	 * @param bool       $allow_url_only_redirects Whether path rules can match.
-	 * @param bool       $allow_post_from          Whether post ID rules can match.
-	 * @param array|null $diagnostics             Collect diagnostics if an array is supplied.
+	 * @param string $rules Rules as entered.
 	 * @return array
 	 */
-	private static function parse_rule_lines( $rules, $allow_url_only_redirects, $allow_post_from, &$diagnostics = null ) {
+	public static function inspect_rules( $rules ) {
+		$issues = array();
+		self::parse_rules( $rules, true, true, $issues );
+
+		return $issues;
+	}
+
+	/**
+	 * Parse rules and optionally report issues at their original positions.
+	 *
+	 * @param string     $rules                   Rule text.
+	 * @param bool       $allow_url_only_redirects Whether path rules can match.
+	 * @param bool       $allow_post_from          Whether post ID rules can match.
+	 * @param array|null $issues                  Collect issues when an array is supplied.
+	 * @return array
+	 */
+	private static function parse_rules( $rules, $allow_url_only_redirects, $allow_post_from, &$issues = null ) {
 		$redirects = array();
 
-		if ( ! is_string( $rules ) || ! $rules ) {
-			return $redirects;
-		}
+		if ( is_string( $rules ) && $rules ) {
 
-		$comments = '/^[ \t]*#.*$|(?<=\s)#.*$/m';
-		if ( null === $diagnostics ) {
-			$without_comments = preg_replace( $comments, '', $rules );
-		} else {
-			// Keep line breaks inside stripped comments to align with the editable text.
-			$without_comments = preg_replace_callback(
-				$comments,
-				static function ( $comment ) {
-					return preg_replace( '/[^\r]+/', ' ', $comment[0] );
-				},
-				$rules
-			);
-		}
-		$lines              = preg_split( "/\r\n|\n|\r/", $without_comments );
-		$original_lines     = null === $diagnostics ? array() : preg_split( "/\r\n|\n|\r/", $rules );
-		$valid_status_codes = self::get_valid_status_codes();
-		$status             = apply_filters( 'redirect_txt_default_status', 301 );
+			/**
+			 * Remove comments, but keep hashes in links.
+			 *
+			 * This regex does two things:
+			 *  1. ^[ \t]*#.*$: Removes lines that start with a hash (optionally preceded by whitespace).
+			 *  2. (?<=\s)#.*$: Removes inline comments that start with a hash preceded by whitespace.
+			 *
+			 * Explanation of the new part:
+			 *  • (?<=\s): Positive lookbehind, ensures the hash is preceded by whitespace
+			 *  • #.*$: Matches the hash and everything after it until the end of the line
+			 */
+			$comments = '/^[ \t]*#.*$|(?<=\s)#.*$/m';
 
-		foreach ( $lines as $index => $line ) {
-			$line = trim( $line );
-
-			if ( '' === $line ) {
-				continue;
+			if ( null === $issues ) {
+				$rules = preg_replace( $comments, '', $rules );
+			} else {
+				$rules = preg_replace_callback(
+					$comments,
+					static function ( $comment ) {
+						return preg_replace( '/[^\r]+/', ' ', $comment[0] );
+					},
+					$rules
+				);
 			}
 
-			foreach ( $valid_status_codes as $status_code => $status_label ) {
-				if ( $line === $status_code . ':' ) {
-					$status = $status_code;
-					continue 2;
+			// Split string by lines.
+			$lines = preg_split( "/\r\n|\n|\r/", $rules );
+
+			$valid_status_codes = self::get_valid_status_codes();
+			$status             = apply_filters( 'redirect_txt_default_status', 301 );
+
+			// Parse each line and prepare redirect array.
+			foreach ( $lines as $index => $line ) {
+				$line = trim( $line );
+
+				// Skip empty line.
+				if ( ! $line ) {
+					continue;
 				}
-			}
 
-			$parts = explode( ': ', $line );
-			$from  = trim( $parts[0] );
-			$to    = 2 === count( $parts ) ? trim( $parts[1] ) : '';
+				// This is a status line.
+				foreach ( $valid_status_codes as $status_code => $status_label ) {
+					if ( $line === $status_code . ':' ) {
+						$status = $status_code;
 
-			if ( ! $from || ! $to ) {
-				if ( null !== $diagnostics ) {
-					$diagnostics[] = self::draft_diagnostic( $index, $original_lines[ $index ], $line );
+						continue 2;
+					}
 				}
-				continue;
-			}
 
-			$from_is_post = is_numeric( $from );
+				// Split line by colon.
+				$parts = preg_split( '/: /', $line );
 
-			if ( ( ! $allow_post_from && $from_is_post ) || ( ! $allow_url_only_redirects && ! $from_is_post ) ) {
-				continue;
-			}
+				// Check if we have 2 parts.
+				$from = trim( $parts[0] );
+				$to   = 2 === count( $parts ) ? trim( $parts[1] ) : '';
 
-			$redirects[ $index ] = array(
-				'from'   => $from,
-				'to'     => $to,
-				'status' => $status,
-			);
-
-			if ( null !== $diagnostics ) {
-				$diagnostic = self::draft_diagnostic( $index, $original_lines[ $index ], $line, $from );
-
-				if ( null !== $diagnostic ) {
-					$diagnostics[] = $diagnostic;
+				if ( ! $from || ! $to ) {
+					if ( null !== $issues ) {
+						$issues[] = array(
+							'line' => $index,
+							'code' => preg_match( '/^[0-9]+:$/D', $line ) ? 'unsupported_status' : 'invalid_rule',
+						);
+					}
+					continue;
 				}
+
+				// Support for post IDs in `from` field.
+				$from_is_post = is_numeric( $from );
+
+				if ( ! $allow_post_from && $from_is_post ) {
+					continue;
+				}
+				if ( ! $allow_url_only_redirects && ! $from_is_post ) {
+					continue;
+				}
+
+				if ( null !== $issues ) {
+					$code = self::source_issue( $from );
+
+					if ( null !== $code ) {
+						$issues[] = array(
+							'line' => $index,
+							'code' => $code,
+						);
+					}
+					continue;
+				}
+
+				$redirects[] = [
+					'from'   => $from,
+					'to'     => $to,
+					'status' => $status,
+				];
 			}
 		}
 
@@ -701,82 +739,21 @@ class Redirect_Txt_Redirects {
 	}
 
 	/**
-	 * Explain a rule that cannot match, and offer a correction when it is unambiguous.
+	 * Explain a source that cannot match a regular request.
 	 *
-	 * @param int    $index    Position of the rule.
-	 * @param string $original Rule text, including spacing and comments.
-	 * @param string $line     Rule text without surrounding space or comments.
-	 * @param string $from     Source of a parsed rule.
-	 * @return array|null
+	 * @param string $from Source as written.
+	 * @return string|null
 	 */
-	private static function draft_diagnostic( $index, $original, $line, $from = '' ) {
-		$diagnostic = array( 'line' => $index );
-
-		if ( '' === $from ) {
-			$diagnostic['code'] = preg_match( '/^[0-9]+:$/D', $line ) ? 'unsupported_status' : 'invalid_rule';
-
-			if ( preg_match( '#^(/(?!/)[^:\s]*|[1-9][0-9]*):(?:/(?!/)[^:\s]*|https?://[^:\s]+|[1-9][0-9]*)$#iD', $line, $parts ) ) {
-				$offset                    = strpos( $original, $line ) + strlen( $parts[1] ) + 1;
-				$diagnostic['replacement'] = substr_replace( $original, ' ', $offset, 0 );
-				$diagnostic['code']        = 'missing_separator';
-			}
-
-			return $diagnostic;
-		}
-
+	private static function source_issue( $from ) {
 		if ( 'regex' === self::get_url_type( $from ) && ! self::is_valid_regex( $from ) ) {
-			$diagnostic['code'] = 'invalid_regex';
-			return $diagnostic;
+			return 'invalid_regex';
 		}
 
 		if ( self::is_absolute_url( $from ) || preg_match( '/^www\./i', $from ) ) {
-			$path               = self::draft_absolute_path( $from, false );
-			$diagnostic['code'] = 'outside_site_source';
-
-			if ( null !== $path ) {
-				$diagnostic['code']        = 'absolute_source';
-				$diagnostic['replacement'] = substr_replace( $original, self::strip_home_path( $path ), strpos( $original, $from ), strlen( $from ) );
-			}
-
-			return $diagnostic;
+			return 'absolute_source';
 		}
 
 		return null;
-	}
-
-	/**
-	 * Get the request path from an HTTP URL belonging to this installation.
-	 *
-	 * @param string $address        URL as entered.
-	 * @param bool   $allow_fragment Whether to accept and drop a fragment.
-	 * @return string|null
-	 */
-	private static function draft_absolute_path( $address, $allow_fragment ) {
-		$parts = wp_parse_url( $address );
-		$home  = wp_parse_url( home_url() );
-
-		if ( empty( $parts['host'] ) || empty( $home['host'] ) ||
-			strtolower( $parts['scheme'] ?? '' ) !== strtolower( $home['scheme'] ?? '' ) ||
-			0 !== strcasecmp( $parts['host'], $home['host'] ) ||
-			self::url_port( $parts ) !== self::url_port( $home ) ||
-			isset( $parts['user'] ) || isset( $parts['pass'] ) ||
-			( ! $allow_fragment && isset( $parts['fragment'] ) )
-		) {
-			return null;
-		}
-
-		$path   = $parts['path'] ?? '/';
-		$prefix = self::home_path_prefix();
-
-		if ( '' !== $prefix && $path !== $prefix && 0 !== strpos( $path, $prefix . '/' ) ) {
-			return null;
-		}
-
-		if ( preg_match( '/[\x00-\x20\x7f\\\\]/', $address ) || preg_match( '#/(?:\.|%2e){1,2}(?:/|$)#i', $path ) ) {
-			return null;
-		}
-
-		return $path . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
 	}
 
 	/**
@@ -787,18 +764,7 @@ class Redirect_Txt_Redirects {
 	 * @return array
 	 */
 	public static function filter_allowed_redirect_hosts( $hosts ) {
-		return self::allow_rule_host( $hosts, self::$whitelist_host );
-	}
-
-	/**
-	 * Add hostname variants accepted for a rule's destination.
-	 *
-	 * @param array  $hosts Allowed hosts.
-	 * @param string $host  Rule's host.
-	 * @return array
-	 */
-	private static function allow_rule_host( $hosts, $host ) {
-		$without_www = preg_replace( '/^www\./i', '', $host );
+		$without_www = preg_replace( '/^www\./i', '', self::$whitelist_host );
 		$with_www    = 'www.' . $without_www;
 
 		// wp_validate_redirect compares the Location host with these case-sensitively.
@@ -911,31 +877,12 @@ class Redirect_Txt_Redirects {
 	 * @return bool|array
 	 */
 	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false, $plain_only = false, $forwarded_query = null ) {
-		$redirects = self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
-
-		return self::match_parsed_rules( $url, $redirects, $plain_only, $forwarded_query );
-	}
-
-	/**
-	 * Match rules in priority order.
-	 *
-	 * @param string      $url             Request path and query.
-	 * @param array       $redirects       Parsed rules.
-	 * @param bool        $plain_only      Whether to skip regex and post ID rules.
-	 * @param string|null $forwarded_query Query before request normalization, or null to use the supplied URL.
-	 * @param bool        $preview         Whether to return draft details without setting a redirect whitelist.
-	 * @return array|false
-	 */
-	private static function match_parsed_rules( $url, $redirects, $plain_only, $forwarded_query, $preview = false ) {
 		global $wp_query;
+
+		$redirects = self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
 
 		if ( empty( $redirects ) ) {
 			return false;
-		}
-
-		if ( $preview ) {
-			$rule_lines = array_keys( $redirects );
-			$redirects  = array_values( $redirects );
 		}
 
 		/**
@@ -972,7 +919,7 @@ class Redirect_Txt_Redirects {
 			}
 		}
 
-		$queried_object = $preview ? null : $wp_query->get_queried_object();
+		$queried_object = $wp_query->get_queried_object();
 
 		foreach ( $redirects as $index => $redirect ) {
 			$from_type    = self::get_url_type( $redirect['from'] );
@@ -1061,7 +1008,7 @@ class Redirect_Txt_Redirects {
 				if ( ! self::$checking_repeat ) {
 					$whitelist_host = self::rule_target_host( 'id' === $to_type ? $to : $redirect['to'], $to );
 
-					if ( $whitelist_host && ! $preview ) {
+					if ( $whitelist_host ) {
 						self::$whitelist_host = $whitelist_host;
 						add_filter( 'allowed_redirect_hosts', 'Redirect_Txt_Redirects::filter_allowed_redirect_hosts' );
 					}
@@ -1113,16 +1060,6 @@ class Redirect_Txt_Redirects {
 					}
 				}
 
-				if ( $preview ) {
-					$status = isset( self::get_valid_status_codes()[ $redirect['status'] ] ) ? $redirect['status'] : apply_filters( 'redirect_txt_default_status', 301 );
-
-					return array(
-						'line'     => $rule_lines[ $index ],
-						'status'   => $status,
-						'location' => self::sends_location( $status ) ? self::preview_location( $to, $whitelist_host, $status ) : null,
-					);
-				}
-
 				return [
 					'from'      => $from,
 					'from_type' => $from_type,
@@ -1136,136 +1073,6 @@ class Redirect_Txt_Redirects {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Compute the location that WordPress would accept without sending it.
-	 *
-	 * @param string $location Matched destination.
-	 * @param string $host     Host permitted by the matching rule.
-	 * @param int    $status   Redirect status.
-	 * @return string
-	 */
-	private static function preview_location( $location, $host, $status ) {
-		$allow = static function ( $hosts ) use ( $host ) {
-			return self::allow_rule_host( $hosts, $host );
-		};
-
-		if ( $host ) {
-			add_filter( 'allowed_redirect_hosts', $allow );
-		}
-
-		try {
-			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Mirror wp_safe_redirect().
-			$fallback = apply_filters( 'wp_safe_redirect_fallback', admin_url(), $status );
-
-			return wp_validate_redirect( wp_sanitize_redirect( $location ), $fallback );
-		} finally {
-			if ( $host ) {
-				remove_filter( 'allowed_redirect_hosts', $allow );
-			}
-		}
-	}
-
-	/**
-	 * Check an unsaved draft and optionally test a URL against it.
-	 *
-	 * @param string      $rules   Draft rule text.
-	 * @param string|null $address Site URL or site-relative path.
-	 * @return array
-	 */
-	public static function inspect_draft( $rules, $address ) {
-		$diagnostics = array();
-		$redirects   = self::parse_rule_lines( $rules, true, true, $diagnostics );
-		$result      = array( 'diagnostics' => $diagnostics );
-
-		if ( null === $address ) {
-			return $result;
-		}
-
-		$result['test'] = self::test_draft_address( $address, $redirects, $diagnostics );
-
-		if ( 'matched' === $result['test']['outcome'] ) {
-			$lines                  = preg_split( "/\r\n|\n|\r/", $rules );
-			$result['test']['rule'] = $lines[ $result['test']['line'] ];
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Apply the path stage of request matching to the draft.
-	 *
-	 * @param string $address     Address to test.
-	 * @param array  $redirects   Parsed rules keyed by position.
-	 * @param array  $diagnostics Diagnostics for this draft.
-	 * @return array
-	 */
-	private static function test_draft_address( $address, $redirects, $diagnostics ) {
-		$address = trim( $address );
-		$path    = null;
-
-		if ( self::is_absolute_url( $address ) ) {
-			$path = self::draft_absolute_path( $address, true );
-		} elseif ( preg_match( '#^/(?!/)[^\x00-\x20\x7f\\\\]*$#D', $address ) ) {
-			$path = self::home_path_prefix() . explode( '#', $address, 2 )[0];
-		}
-
-		if ( null === $path ) {
-			return array( 'outcome' => 'invalid_address' );
-		}
-
-		$path = preg_replace_callback(
-			'/[\x80-\xff]/',
-			static function ( $octet ) {
-				return rawurlencode( $octet[0] );
-			},
-			$path
-		);
-
-		[ $url, $forwarded_query ] = self::prepare_requested_url( $path );
-
-		if ( self::is_protected_path( $url ) ) {
-			return array( 'outcome' => 'protected' );
-		}
-
-		foreach ( $diagnostics as $diagnostic ) {
-			if ( 'invalid_regex' === $diagnostic['code'] ) {
-				unset( $redirects[ $diagnostic['line'] ] );
-			}
-		}
-
-		$post_rules = false;
-
-		foreach ( $redirects as $index => $redirect ) {
-			if ( 'id' === self::get_url_type( $redirect['from'] ) ) {
-				$post_rules = true;
-				unset( $redirects[ $index ] );
-			}
-		}
-
-		if ( count( $redirects ) > self::MAX_PREVIEW_RULES ) {
-			return array(
-				'outcome' => 'too_many_rules',
-				'limit'   => self::MAX_PREVIEW_RULES,
-			);
-		}
-
-		$match = self::match_parsed_rules( $url, $redirects, false, $forwarded_query, true );
-
-		if ( ! $match ) {
-			[ $legacy_url ] = self::prepare_requested_url( sanitize_text_field( $path ) );
-
-			if ( $legacy_url !== $url ) {
-				$match = self::match_parsed_rules( $legacy_url, $redirects, true, $forwarded_query, true );
-			}
-		}
-
-		if ( $match ) {
-			return array( 'outcome' => 'matched' ) + $match;
-		}
-
-		return array( 'outcome' => $post_rules ? 'post_resolution' : 'no_match' );
 	}
 
 	/**
@@ -1348,29 +1155,6 @@ class Redirect_Txt_Redirects {
 		return ! empty( $not_protected );
 	}
 
-
-	/**
-	 * Normalize the path the same way for live requests and the draft test.
-	 *
-	 * @param string $url Request path and query.
-	 * @return string[] The normalized request URL and the original sanitized query.
-	 */
-	private static function prepare_requested_url( $url ) {
-		$url             = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $url ) );
-		$forwarded_query = (string) wp_parse_url( $url, PHP_URL_QUERY );
-
-		/**
-		 * The trailing slash goes before matching, and it has to. A rule anchored with
-		 * `$`, such as `^/old$`, is written against this stripped form, so a request for
-		 * `/old/` only reaches it once the slash is gone. The cost is that a regex rule
-		 * rebuilds its target from a URL that has already lost the slash, so a request
-		 * for `/old/thing/` still redirects to `/new/thing` and WordPress adds the slash
-		 * back with a second hop. Plain rules do not pay that, because their target comes
-		 * from the rule rather than from the request.
-		 */
-		return [ untrailingslashit( stripslashes( $url ) ), $forwarded_query ];
-	}
-
 	/**
 	 * Check URL for available redirect and process it.
 	 *
@@ -1383,9 +1167,20 @@ class Redirect_Txt_Redirects {
 
 		// sanitize_text_field would drop %-encoded octets, so `/caf%C3%A9` could never match.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw below.
-		$requested_url = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$requested_url   = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$requested_url   = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $requested_url ) );
+		$forwarded_query = (string) wp_parse_url( $requested_url, PHP_URL_QUERY );
 
-		[ $requested_url, $forwarded_query ] = self::prepare_requested_url( $requested_url );
+		/**
+		 * The trailing slash goes before matching, and it has to. A rule anchored with
+		 * `$`, such as `^/old$`, is written against this stripped form, so a request for
+		 * `/old/` only reaches it once the slash is gone. The cost is that a regex rule
+		 * rebuilds its target from a URL that has already lost the slash, so a request
+		 * for `/old/thing/` still redirects to `/new/thing` and WordPress adds the slash
+		 * back with a second hop. Plain rules do not pay that, because their target comes
+		 * from the rule rather than from the request.
+		 */
+		$requested_url = untrailingslashit( stripslashes( $requested_url ) );
 
 		// Skip protected paths.
 		if ( self::is_protected_path( $requested_url ) ) {
@@ -1402,8 +1197,7 @@ class Redirect_Txt_Redirects {
 		if ( ! $match_redirect ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitize_text_field is the old reduction, esc_url_raw follows.
 			$legacy_url = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-
-			[ $legacy_url ] = self::prepare_requested_url( $legacy_url );
+			$legacy_url = untrailingslashit( stripslashes( esc_url_raw( apply_filters( 'redirect_txt_requested_url', $legacy_url ) ) ) );
 
 			if ( $legacy_url !== $requested_url ) {
 				$match_redirect = self::match_redirect( $legacy_url, true, $forwarded_query );

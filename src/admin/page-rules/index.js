@@ -5,7 +5,7 @@ import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 
 import { ReactComponent as LoadingIcon } from '../../icons/loading.svg';
-import DraftEditor from './draft-editor';
+import RuleEditor from './rule-editor';
 import Button from '../../components/button';
 
 const isMac = window.navigator.platform.indexOf('Mac') > -1;
@@ -57,7 +57,16 @@ export default function PageRules() {
 		<>
 			<div className="redirect-txt-admin-rules-card">
 				<h2>{__('Redirect Rules', 'redirect-txt')}</h2>
-				<DraftEditor rules={pendingRules} onChange={setPendingRules} />
+				<RuleEditor rules={pendingRules} onChange={setPendingRules} />
+				<div
+					className="redirect-txt-admin-rules-card-description"
+					id="redirect-txt-rules-help"
+				>
+					{__(
+						'Provide a list of all your redirect rules. Use a yaml-like format. Each redirect should be in a new line. Each redirect should have a source and a target separated by a colon. For example: /old-url: /new-url',
+						'redirect-txt'
+					)}
+				</div>
 			</div>
 			{error && (
 				<div className="redirect-txt-admin-rules-error">{error}</div>
