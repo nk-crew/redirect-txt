@@ -772,7 +772,7 @@ class Redirect_Txt_Redirects {
 			return null;
 		}
 
-		if ( preg_match( '#[\x00-\x20\x7f\\\\]|(?:^|/)(?:\.|%2e){1,2}(?:/|[?\#]|$)#i', $address ) ) {
+		if ( preg_match( '/[\x00-\x20\x7f\\\\]/', $address ) || preg_match( '#/(?:\.|%2e){1,2}(?:/|$)#i', $path ) ) {
 			return null;
 		}
 

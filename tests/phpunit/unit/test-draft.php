@@ -147,14 +147,16 @@ class DraftTest extends WP_UnitTestCase {
 		$draft = "/wp-admin/: /away/\n/: /away/\n24: /new/\n/account/: /";
 
 		$cases = array(
-			'/wp-admin/'                         => 'protected',
-			'https://example.test/blog/wp-json/' => 'protected',
-			'/?rest_route=/wp/v2/posts'          => 'protected',
-			'/post-slug/'                        => 'post_resolution',
-			'https://example.test/elsewhere/'    => 'invalid_address',
-			'https://elsewhere.test/blog/'       => 'invalid_address',
-			'https://example.test/blog/account/' => 'matched',
-			'/account/'                          => 'matched',
+			'/wp-admin/'                                    => 'protected',
+			'https://example.test/blog/wp-json/'            => 'protected',
+			'/?rest_route=/wp/v2/posts'                     => 'protected',
+			'/post-slug/'                                   => 'post_resolution',
+			'https://example.test/elsewhere/'               => 'invalid_address',
+			'https://example.test/blog/../elsewhere/'       => 'invalid_address',
+			'https://elsewhere.test/blog/'                  => 'invalid_address',
+			'https://example.test/blog/account/'            => 'matched',
+			'https://example.test/blog/account/?next=/../' => 'matched',
+			'/account/'                                     => 'matched',
 		);
 
 		foreach ( $cases as $address => $outcome ) {
