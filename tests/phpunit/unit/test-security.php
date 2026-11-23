@@ -165,6 +165,40 @@ class SecurityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Forward request query bytes before the destination fragment.
+	 */
+	public function test_forwards_query_before_target_fragment() {
+		$this->assertSame( '/new/?code=AbC#details', $this->location_for( '/old/?code=AbC', '/old/: /new/#details' ) );
+		$this->assertSame( '/new/?z=%2F&a=Ab%2b+Cd&a=/Path/#details?tab', $this->location_for( '/old/?z=%2F&a=Ab%2b+Cd&a=/Path/', '/old/: /new/#details?tab' ) );
+		$this->assertSame( '/new/?code=AbC/', $this->location_for( '/old/?code=AbC/', '/old/: /new/' ) );
+		$this->assertSame( '/new/#details?tab', $this->location_for( '/old/', '/old/: /new/#details?tab' ) );
+	}
+
+	/**
+	 * A query in the rule keeps its existing precedence.
+	 */
+	public function test_redirect_query_precedence() {
+		$this->assertSame( '/new/?code=Fixed#details', $this->location_for( '/old/?code=AbC', '/old/: /new/?code=Fixed#details' ) );
+		$this->assertSame( '/new/#details', $this->location_for( '/old/?code=AbC', '/old/?code=abc: /new/#details' ) );
+	}
+
+	/**
+	 * Forward encoded query bytes even when an older rule matches the reduced path.
+	 */
+	public function test_legacy_path_match_forwards_original_query() {
+		$this->assertSame( '/cafe?code=%2FA', $this->location_for( '/caf%C3%A9?code=%2FA', '/caf: /cafe' ) );
+	}
+
+	/**
+	 * An installation subdirectory does not alter the forwarded query.
+	 */
+	public function test_forwards_query_in_a_subdirectory() {
+		update_option( 'home', home_url( '/subdir' ) );
+
+		$this->assertSame( '/subdir/new/?code=AbC#details', $this->location_for( '/subdir/old/?code=AbC', '/old/: /new/#details' ) );
+	}
+
+	/**
 	 * REST requests on plain permalinks are not redirected.
 	 */
 	public function test_rest_route_query_is_protected() {

@@ -797,15 +797,16 @@ class Redirect_Txt_Redirects {
 	/**
 	 * Check if URL match any of rules and return it.
 	 *
-	 * @param string $url - full URL to check if it match anything in rules list.
-	 * @param string $rules - rules list.
-	 * @param bool   $allow_url_only_redirects - allow redirecting using URLs only.
-	 * @param bool   $allow_post_from - allow redirecting from post IDs.
-	 * @param bool   $plain_only - match plain URL rules only, skipping regex and post ID rules.
+	 * @param string      $url - full URL to check if it match anything in rules list.
+	 * @param string      $rules - rules list.
+	 * @param bool        $allow_url_only_redirects - allow redirecting using URLs only.
+	 * @param bool        $allow_post_from - allow redirecting from post IDs.
+	 * @param bool        $plain_only - match plain URL rules only, skipping regex and post ID rules.
+	 * @param string|null $forwarded_query Query before request normalization, or null to use the supplied URL.
 	 *
 	 * @return bool|array
 	 */
-	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false, $plain_only = false ) {
+	public static function match_url_to_rules( $url, $rules, $allow_url_only_redirects = true, $allow_post_from = false, $plain_only = false, $forwarded_query = null ) {
 		global $wp_query;
 
 		$redirects = self::parse_redirect_rules( $rules, $allow_url_only_redirects, $allow_post_from );
@@ -829,27 +830,23 @@ class Redirect_Txt_Redirects {
 		$normalized_requested_url = strtolower( $url );
 
 		if ( function_exists( 'wp_parse_url' ) ) {
-			$parsed_requested_url = wp_parse_url( $normalized_requested_url );
+			$parsed_requested_url = wp_parse_url( $url );
 		} else {
 			// phpcs:ignore
-			$parsed_requested_url = parse_url( $normalized_requested_url );
+			$parsed_requested_url = parse_url( $url );
 		}
 
 		// Normalize the request path with and without query strings, for comparison later.
 		$normalized_requested_url_no_query = '';
-		$requested_query_params            = '';
+		$forwarded_query                   = $forwarded_query ?? $parsed_requested_url['query'] ?? '';
 
 		if ( ! empty( $parsed_requested_url['path'] ) ) {
-			$normalized_requested_url_no_query = untrailingslashit( stripslashes( $parsed_requested_url['path'] ) );
+			$normalized_requested_url_no_query = untrailingslashit( stripslashes( strtolower( $parsed_requested_url['path'] ) ) );
 
 			// untrailingslashit( '/' ) is ''. That is the homepage, and `from` uses `/` for it.
 			if ( '' === $normalized_requested_url_no_query ) {
 				$normalized_requested_url_no_query = '/';
 			}
-		}
-
-		if ( ! empty( $parsed_requested_url['query'] ) ) {
-			$requested_query_params = $parsed_requested_url['query'];
 		}
 
 		$queried_object = $wp_query->get_queried_object();
@@ -947,10 +944,13 @@ class Redirect_Txt_Redirects {
 					}
 				}
 
-				// Re-add the query params if they've not already been added by the wildcard
-				// query params are forwarded to allow for attribution and marketing params to be maintained.
-				if ( ! $match_query_params && ! empty( $requested_query_params ) && ! strpos( $to, '?' ) ) {
-					$to .= '?' . $requested_query_params;
+				if ( ! $match_query_params && '' !== $forwarded_query ) {
+					$target_parts = explode( '#', $to, 2 );
+
+					if ( false === strpos( $target_parts[0], '?' ) ) {
+						$target_parts[0] .= '?' . $forwarded_query;
+						$to               = implode( '#', $target_parts );
+					}
 				}
 
 				/**
@@ -1006,12 +1006,13 @@ class Redirect_Txt_Redirects {
 	/**
 	 * Check if URL match any of redirect rules and return it.
 	 *
-	 * @param string $requested_url - url to check.
-	 * @param bool   $plain_only - match plain URL rules only.
+	 * @param string      $requested_url - url to check.
+	 * @param bool        $plain_only - match plain URL rules only.
+	 * @param string|null $forwarded_query Query before request normalization, or null to use the supplied URL.
 	 *
 	 * @return bool|array
 	 */
-	public static function match_redirect( $requested_url, $plain_only = false ) {
+	public static function match_redirect( $requested_url, $plain_only = false, $forwarded_query = null ) {
 		global $wp_query;
 
 		// Allow redirects from post IDs.
@@ -1020,7 +1021,7 @@ class Redirect_Txt_Redirects {
 		$allow_post_from          = (bool) $wp_query->get_queried_object();
 		$rules                    = get_option( 'redirect_txt_rules', '' );
 
-		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from, $plain_only );
+		return self::match_url_to_rules( $requested_url, $rules, $allow_url_only_redirects, $allow_post_from, $plain_only, $forwarded_query );
 	}
 
 	/**
@@ -1094,8 +1095,9 @@ class Redirect_Txt_Redirects {
 
 		// sanitize_text_field would drop %-encoded octets, so `/caf%C3%A9` could never match.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- esc_url_raw below.
-		$requested_url = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
-		$requested_url = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $requested_url ) );
+		$requested_url   = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$requested_url   = esc_url_raw( apply_filters( 'redirect_txt_requested_url', $requested_url ) );
+		$forwarded_query = (string) wp_parse_url( $requested_url, PHP_URL_QUERY );
 
 		/**
 		 * The trailing slash goes before matching, and it has to. A rule anchored with
@@ -1113,7 +1115,7 @@ class Redirect_Txt_Redirects {
 			return;
 		}
 
-		$match_redirect = self::match_redirect( $requested_url );
+		$match_redirect = self::match_redirect( $requested_url, false, $forwarded_query );
 
 		/**
 		 * Rules saved by earlier versions went through sanitize_textarea_field, which drops
@@ -1126,7 +1128,7 @@ class Redirect_Txt_Redirects {
 			$legacy_url = untrailingslashit( stripslashes( esc_url_raw( apply_filters( 'redirect_txt_requested_url', $legacy_url ) ) ) );
 
 			if ( $legacy_url !== $requested_url ) {
-				$match_redirect = self::match_redirect( $legacy_url, true );
+				$match_redirect = self::match_redirect( $legacy_url, true, $forwarded_query );
 			}
 		}
 
