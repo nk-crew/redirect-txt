@@ -231,9 +231,17 @@ class SecurityTest extends WP_UnitTestCase {
 	 * An installation subdirectory does not alter the forwarded query.
 	 */
 	public function test_forwards_query_in_a_subdirectory() {
-		update_option( 'home', home_url( '/subdir' ) );
+		$home              = home_url( '/subdir' );
+		$subdirectory_home = static function () use ( $home ) {
+			return $home;
+		};
+		add_filter( 'pre_option_home', $subdirectory_home );
 
-		$this->assertSame( '/subdir/new/?code=AbC#details', $this->location_for( '/subdir/old/?code=AbC', '/old/: /new/#details' ) );
+		try {
+			$this->assertSame( '/subdir/new/?code=AbC#details', $this->location_for( '/subdir/old/?code=AbC', '/old/: /new/#details' ) );
+		} finally {
+			remove_filter( 'pre_option_home', $subdirectory_home );
+		}
 	}
 
 	/**
