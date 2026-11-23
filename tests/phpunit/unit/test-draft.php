@@ -10,6 +10,18 @@
  */
 class DraftTest extends WP_UnitTestCase {
 	/**
+	 * Use a subdirectory home regardless of wp-env's WP_HOME constant.
+	 */
+	private function use_subdirectory_home() {
+		add_filter(
+			'pre_option_home',
+			static function () {
+				return 'https://example.test/blog';
+			}
+		);
+	}
+
+	/**
 	 * Send a draft to the registered endpoint.
 	 *
 	 * @param mixed       $rules   Draft rules.
@@ -52,7 +64,7 @@ class DraftTest extends WP_UnitTestCase {
 	 */
 	public function test_draft_diagnostics_propose_only_supported_corrections() {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
-		update_option( 'home', 'https://example.test/blog' );
+		$this->use_subdirectory_home();
 
 		$draft = "# Example\r\n  /old/:/new/   # keep this\r\nhttps://example.test/blog/account/: / # homepage\r\nhttps://example.test:8443/blog/account/: /\r\nhttps://example.test/blogs/account/: /\r\nhttps://elsewhere.test/blog/account/: /\r\n^/(broken: /x\r\n302:\r\n/good/: /destination/";
 
@@ -142,7 +154,7 @@ class DraftTest extends WP_UnitTestCase {
 	 */
 	public function test_draft_respects_request_boundaries() {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
-		update_option( 'home', 'https://example.test/blog' );
+		$this->use_subdirectory_home();
 
 		$draft = "/wp-admin/: /away/\n/: /away/\n24: /new/\n/account/: /";
 
