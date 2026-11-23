@@ -40,3 +40,45 @@
 		transform: rotate(360deg);
 	}
 }
+
+.redirect-txt-rule-editor {
+	position: relative;
+
+	.redirect-txt-editor {
+		overflow: hidden;
+	}
+
+	.code-line {
+		display: block;
+	}
+
+	.w-tc-editor-preview code.language-yaml + br {
+		display: none;
+	}
+
+	[data-redirect-txt-issue] {
+		margin-inline: calc(-1 * var(--redirect-txt-rules-padding));
+		padding-inline: var(--redirect-txt-rules-padding);
+		background: #f6f7f7;
+	}
+
+	[data-redirect-txt-issue="invalid_regex"] {
+		background: var(--redirect-txt-error-light-color);
+	}
+}
+
+.redirect-txt-rule-tooltip {
+	position: absolute;
+	z-index: 1;
+	inset-inline-start: calc(var(--redirect-txt-rules-padding) + 1px);
+	box-sizing: border-box;
+	width: max-content;
+	max-width: min(280px, calc(100% - 2 * var(--redirect-txt-rules-padding)));
+	padding: 2px 7px;
+	border-radius: 2px;
+	background: #1d2327;
+	color: #fff;
+	font-size: 12px;
+	line-height: 14px;
+	overflow-wrap: anywhere;
+}

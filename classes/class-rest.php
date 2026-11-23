@@ -51,6 +51,16 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 			]
 		);
 
+		register_rest_route(
+			$namespace,
+			'/inspect_rules/',
+			[
+				'methods'             => [ 'POST' ],
+				'callback'            => [ $this, 'inspect_rules' ],
+				'permission_callback' => [ $this, 'update_rules_permission' ],
+			]
+		);
+
 		// Update Settings.
 		register_rest_route(
 			$namespace,
@@ -114,6 +124,26 @@ class Redirect_Txt_Rest extends WP_REST_Controller {
 		}
 
 		return $this->success( true );
+	}
+
+	/**
+	 * Explain issues in the editor text.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function inspect_rules( WP_REST_Request $req ) {
+		$rules = $req->get_param( 'rules' );
+
+		if ( ! is_string( $rules ) || wp_check_invalid_utf8( $rules ) !== $rules || false !== strpos( $rules, "\0" ) ) {
+			return $this->error( 'invalid_rules', __( 'The rules contain invalid text.', 'redirect-txt' ), true, 400 );
+		}
+
+		if ( strlen( $rules ) > 256 * 1024 ) {
+			return $this->error( 'rules_too_large', __( 'The rules are too long to check.', 'redirect-txt' ), true, 413 );
+		}
+
+		return $this->success( Redirect_Txt_Redirects::inspect_rules( $rules ) );
 	}
 
 	/**

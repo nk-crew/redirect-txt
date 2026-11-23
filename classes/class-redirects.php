@@ -609,6 +609,32 @@ class Redirect_Txt_Redirects {
 	 * @return array
 	 */
 	public static function parse_redirect_rules( $rules, $allow_url_only_redirects = true, $allow_post_from = false ) {
+		return self::parse_rules( $rules, $allow_url_only_redirects, $allow_post_from );
+	}
+
+	/**
+	 * Inspect each line using the same grammar as the redirect handler.
+	 *
+	 * @param string $rules Rules as entered.
+	 * @return array
+	 */
+	public static function inspect_rules( $rules ) {
+		$issues = array();
+		self::parse_rules( $rules, true, true, $issues );
+
+		return $issues;
+	}
+
+	/**
+	 * Parse rules and optionally report issues at their original positions.
+	 *
+	 * @param string     $rules                   Rule text.
+	 * @param bool       $allow_url_only_redirects Whether path rules can match.
+	 * @param bool       $allow_post_from          Whether post ID rules can match.
+	 * @param array|null $issues                  Collect issues when an array is supplied.
+	 * @return array
+	 */
+	private static function parse_rules( $rules, $allow_url_only_redirects, $allow_post_from, &$issues = null ) {
 		$redirects = array();
 
 		if ( is_string( $rules ) && $rules ) {
@@ -624,7 +650,19 @@ class Redirect_Txt_Redirects {
 			 *  • (?<=\s): Positive lookbehind, ensures the hash is preceded by whitespace
 			 *  • #.*$: Matches the hash and everything after it until the end of the line
 			 */
-			$rules = preg_replace( '/^[ \t]*#.*$|(?<=\s)#.*$/m', '', $rules );
+			$comments = '/^[ \t]*#.*$|(?<=\s)#.*$/m';
+
+			if ( null === $issues ) {
+				$rules = preg_replace( $comments, '', $rules );
+			} else {
+				$rules = preg_replace_callback(
+					$comments,
+					static function ( $comment ) {
+						return preg_replace( '/[^\r]+/', ' ', $comment[0] );
+					},
+					$rules
+				);
+			}
 
 			// Split string by lines.
 			$lines = preg_split( "/\r\n|\n|\r/", $rules );
@@ -633,7 +671,7 @@ class Redirect_Txt_Redirects {
 			$status             = apply_filters( 'redirect_txt_default_status', 301 );
 
 			// Parse each line and prepare redirect array.
-			foreach ( $lines as $line ) {
+			foreach ( $lines as $index => $line ) {
 				$line = trim( $line );
 
 				// Skip empty line.
@@ -654,14 +692,16 @@ class Redirect_Txt_Redirects {
 				$parts = preg_split( '/: /', $line );
 
 				// Check if we have 2 parts.
-				if ( count( $parts ) !== 2 ) {
-					continue;
-				}
-
 				$from = trim( $parts[0] );
-				$to   = trim( $parts[1] );
+				$to   = 2 === count( $parts ) ? trim( $parts[1] ) : '';
 
 				if ( ! $from || ! $to ) {
+					if ( null !== $issues ) {
+						$issues[] = array(
+							'line' => $index,
+							'code' => preg_match( '/^[0-9]+:$/D', $line ) ? 'unsupported_status' : 'invalid_rule',
+						);
+					}
 					continue;
 				}
 
@@ -675,6 +715,18 @@ class Redirect_Txt_Redirects {
 					continue;
 				}
 
+				if ( null !== $issues ) {
+					$code = self::source_issue( $from );
+
+					if ( null !== $code ) {
+						$issues[] = array(
+							'line' => $index,
+							'code' => $code,
+						);
+					}
+					continue;
+				}
+
 				$redirects[] = [
 					'from'   => $from,
 					'to'     => $to,
@@ -684,6 +736,24 @@ class Redirect_Txt_Redirects {
 		}
 
 		return $redirects;
+	}
+
+	/**
+	 * Explain a source that cannot match a regular request.
+	 *
+	 * @param string $from Source as written.
+	 * @return string|null
+	 */
+	private static function source_issue( $from ) {
+		if ( 'regex' === self::get_url_type( $from ) && ! self::is_valid_regex( $from ) ) {
+			return 'invalid_regex';
+		}
+
+		if ( self::is_absolute_url( $from ) || preg_match( '/^www\./i', $from ) ) {
+			return 'absolute_source';
+		}
+
+		return null;
 	}
 
 	/**

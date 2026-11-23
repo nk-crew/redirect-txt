@@ -5,15 +5,13 @@ import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 
 import { ReactComponent as LoadingIcon } from '../../icons/loading.svg';
-import Editor from '../../components/editor';
+import RuleEditor from './rule-editor';
 import Button from '../../components/button';
 
 const isMac = window.navigator.platform.indexOf('Mac') > -1;
 
 export default function PageRules() {
-	const [pendingRules, setPendingRules] = useState('');
 	const [savingRules, setSavingRules] = useState(false);
-	const [rulesChanged, setRulesChanged] = useState(false);
 
 	const { updateRules } = useDispatch('redirect-txt/rules');
 
@@ -27,15 +25,8 @@ export default function PageRules() {
 		};
 	});
 
-	// Update pending rules.
-	useEffect(() => {
-		setPendingRules(rules);
-	}, [rules]);
-
-	// Check if rules changed.
-	useEffect(() => {
-		setRulesChanged(rules !== pendingRules);
-	}, [rules, pendingRules]);
+	const [pendingRules, setPendingRules] = useState(rules);
+	const rulesChanged = rules !== pendingRules;
 
 	// Save when CMD+S pressed.
 	useEffect(() => {
@@ -66,14 +57,11 @@ export default function PageRules() {
 		<>
 			<div className="redirect-txt-admin-rules-card">
 				<h2>{__('Redirect Rules', 'redirect-txt')}</h2>
-				<Editor
-					value={rules}
-					language="yaml"
-					placeholder={__('Enter rules…', 'redirect-txt')}
-					onChange={(evn) => setPendingRules(evn.target.value)}
-					padding={15}
-				/>
-				<div className="redirect-txt-admin-rules-card-description">
+				<RuleEditor rules={pendingRules} onChange={setPendingRules} />
+				<div
+					className="redirect-txt-admin-rules-card-description"
+					id="redirect-txt-rules-help"
+				>
 					{__(
 						'Provide a list of all your redirect rules. Use a yaml-like format. Each redirect should be in a new line. Each redirect should have a source and a target separated by a colon. For example: /old-url: /new-url',
 						'redirect-txt'
