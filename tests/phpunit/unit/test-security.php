@@ -83,6 +83,36 @@ class SecurityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The draft endpoint and live handler forward the same filtered query.
+	 */
+	public function test_draft_and_live_preserve_filtered_query() {
+		wp_set_current_user( self::$admin_id );
+
+		$query_filter = static function ( $url ) {
+			return str_replace( 'code=AbC', 'code=AbC%2a', $url );
+		};
+		add_filter( 'redirect_txt_requested_url', $query_filter );
+
+		try {
+			$rules    = "/old/: /new/#details\n/caf: /new/#details";
+			$expected = '/new/?code=AbC%2a&encoded=%2F%2f&next=/Orders/#details';
+
+			foreach ( array( '/old/', '/caf%C3%A9/' ) as $path ) {
+				$address = $path . '?code=AbC&encoded=%2F%2f&next=/Orders/';
+				$request = new WP_REST_Request( 'POST', '/redirect-txt/v1/inspect_draft' );
+				$request->set_param( 'rules', $rules );
+				$request->set_param( 'address', $address );
+
+				$preview = rest_do_request( $request )->get_data()['response']['test'];
+				$this->assertSame( $expected, $preview['location'], $address );
+				$this->assertSame( $expected, $this->location_for( $address, $rules ), $address );
+			}
+		} finally {
+			remove_filter( 'redirect_txt_requested_url', $query_filter );
+		}
+	}
+
+	/**
 	 * A host built from the request is not whitelisted.
 	 */
 	public function test_regex_host_from_request_is_not_whitelisted() {
@@ -162,6 +192,48 @@ class SecurityTest extends WP_UnitTestCase {
 		$this->assertStringEndsWith( '/cafe', (string) $this->location_for( '/caf%C3%A9', '/caf%C3%A9: /cafe' ) );
 		$this->assertStringEndsWith( '/cafe', (string) $this->location_for( '/caf%C3%A9', '/café: /cafe' ) );
 		$this->assertNull( $this->location_for( '/caf', '/caf%C3%A9: /cafe' ) );
+	}
+
+	/**
+	 * Forward request query bytes before the destination fragment.
+	 */
+	public function test_forwards_query_before_target_fragment() {
+		$this->assertSame( '/new/?code=AbC#details', $this->location_for( '/old/?code=AbC', '/old/: /new/#details' ) );
+		$this->assertSame( '/new/?z=%2F&a=Ab%2b+Cd&a=/Path/#details?tab', $this->location_for( '/old/?z=%2F&a=Ab%2b+Cd&a=/Path/', '/old/: /new/#details?tab' ) );
+		$this->assertSame( '/new/?code=AbC/', $this->location_for( '/old/?code=AbC/', '/old/: /new/' ) );
+		$this->assertSame( '/new/#details?tab', $this->location_for( '/old/', '/old/: /new/#details?tab' ) );
+	}
+
+	/**
+	 * A query in the rule keeps its existing precedence.
+	 */
+	public function test_redirect_query_precedence() {
+		$this->assertSame( '/new/?code=Fixed#details', $this->location_for( '/old/?code=AbC', '/old/: /new/?code=Fixed#details' ) );
+		$this->assertSame( '/new/#details', $this->location_for( '/old/?code=AbC', '/old/?code=abc: /new/#details' ) );
+	}
+
+	/**
+	 * A regex replacement can retain the request query in its fragment.
+	 */
+	public function test_regex_fragment_preserves_replacement_and_loop_check() {
+		$this->assertSame( '/new#details?code=/A', $this->location_for( '/old?code=%2FA', '^/old: /new#details' ) );
+		$this->assertNull( $this->location_for( '/old?code=AbC', '^/old: /old#section' ) );
+	}
+
+	/**
+	 * Forward encoded query bytes even when an older rule matches the reduced path.
+	 */
+	public function test_legacy_path_match_forwards_original_query() {
+		$this->assertSame( '/cafe?code=%2FA', $this->location_for( '/caf%C3%A9?code=%2FA', '/caf: /cafe' ) );
+	}
+
+	/**
+	 * An installation subdirectory does not alter the forwarded query.
+	 */
+	public function test_forwards_query_in_a_subdirectory() {
+		update_option( 'home', home_url( '/subdir' ) );
+
+		$this->assertSame( '/subdir/new/?code=AbC#details', $this->location_for( '/subdir/old/?code=AbC', '/old/: /new/#details' ) );
 	}
 
 	/**
