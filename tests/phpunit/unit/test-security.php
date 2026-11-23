@@ -183,6 +183,14 @@ class SecurityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A regex replacement can retain the request query in its fragment.
+	 */
+	public function test_regex_fragment_preserves_replacement_and_loop_check() {
+		$this->assertSame( '/new#details?code=/A', $this->location_for( '/old?code=%2FA', '^/old: /new#details' ) );
+		$this->assertNull( $this->location_for( '/old?code=AbC', '^/old: /old#section' ) );
+	}
+
+	/**
 	 * Forward encoded query bytes even when an older rule matches the reduced path.
 	 */
 	public function test_legacy_path_match_forwards_original_query() {

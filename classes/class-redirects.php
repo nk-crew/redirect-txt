@@ -944,7 +944,9 @@ class Redirect_Txt_Redirects {
 					}
 				}
 
-				if ( ! $match_query_params && '' !== $forwarded_query ) {
+				$regex_kept_query = 'regex' === $from_type && false !== strpos( $to, '?' );
+
+				if ( ! $match_query_params && ! $regex_kept_query && '' !== $forwarded_query ) {
 					$target_parts = explode( '#', $to, 2 );
 
 					if ( false === strpos( $target_parts[0], '?' ) ) {
