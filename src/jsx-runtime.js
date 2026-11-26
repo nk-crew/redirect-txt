@@ -3,13 +3,16 @@ import { createElement, Fragment } from '@wordpress/element';
 
 export { Fragment };
 
-export function jsx(type, props, key) {
+export function jsx(type, props, key, ...children) {
 	return createElement(
 		type,
 		key === undefined
 			? props
-			: { ...props, key: props.key === undefined ? key : props.key }
+			: { ...props, key: props.key === undefined ? key : props.key },
+		...children
 	);
 }
 
-export { jsx as jsxs };
+export function jsxs(type, props, key) {
+	return jsx(type, props, key, ...props.children);
+}
