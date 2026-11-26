@@ -1,13 +1,18 @@
-export function getLogs(state, redirectLogs, notFoundLogs) {
-	if (state?.logs && (redirectLogs || notFoundLogs)) {
-		return state.logs.filter((log) => {
-			if (log.status === 404) {
-				return notFoundLogs;
-			}
+import { createSelector } from '@wordpress/data';
 
-			return redirectLogs;
-		});
-	}
+export const getLogs = createSelector(
+	(state, redirectLogs, notFoundLogs) => {
+		if (state?.logs && (redirectLogs || notFoundLogs)) {
+			return state.logs.filter((log) => {
+				if (log.status === 404) {
+					return notFoundLogs;
+				}
 
-	return [];
-}
+				return redirectLogs;
+			});
+		}
+
+		return [];
+	},
+	(state) => [state?.logs]
+);
