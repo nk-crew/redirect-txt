@@ -57,7 +57,7 @@ export default function PageLogs() {
 							</tr>
 						</thead>
 						<tbody>
-							{logs.map((log) => {
+							{logs.map((log, index) => {
 								const date = new Date(log.timestamp * 1000);
 								const fromIsPost = log.from_type === 'id';
 								const toIsPost = log.to_type === 'id';
@@ -65,7 +65,7 @@ export default function PageLogs() {
 									toIsPost || log.to_rule || log.url_to;
 
 								return (
-									<tr key={log.timestamp}>
+									<tr key={`${log.timestamp}-${index}`}>
 										<th scope="row">
 											<span
 												className={clsx(
